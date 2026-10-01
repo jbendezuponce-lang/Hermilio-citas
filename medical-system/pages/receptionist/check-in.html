@@ -18,27 +18,19 @@
   <div class="main-content">
     <div id="topbar-mount"></div>
     <div class="content-area">
-      <div class="content-header"><div><h1>Patient Check-in</h1><p>Track patient arrival through the visit workflow.</p></div></div>
-
-      <div class="grid grid-4" style="margin-bottom:22px;">
-        <div class="card text-center" style="padding:16px;"><div class="badge badge-blue" style="margin-bottom:6px;">Confirmed</div><p class="text-muted" style="font-size:.8rem;margin:0;">Appointment booked</p></div>
-        <div class="card text-center" style="padding:16px;"><div class="badge badge-purple" style="margin-bottom:6px;">Waiting</div><p class="text-muted" style="font-size:.8rem;margin:0;">Checked in, waiting room</p></div>
-        <div class="card text-center" style="padding:16px;"><div class="badge badge-teal" style="margin-bottom:6px;">In Consultation</div><p class="text-muted" style="font-size:.8rem;margin:0;">With the doctor</p></div>
-        <div class="card text-center" style="padding:16px;"><div class="badge badge-green" style="margin-bottom:6px;">Completed</div><p class="text-muted" style="font-size:.8rem;margin:0;">Visit finished</p></div>
+      <div class="content-header">
+        <div><h1 id="pageTitle">Patient Check-in</h1><p id="pageSub">Confirm the arrival of today's patients (RF-23).</p></div>
+        
       </div>
-
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr><th>Patient</th><th>Doctor</th><th>Time</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody id="ciBody"></tbody>
-        </table>
-      </div>
-      <div id="ciEmpty"></div>
+      <div class="toolbar"><div class="search-input"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="cSearch" placeholder="Search by patient name or document..."></div><button class="btn btn-outline" id="cReload"><i class="fa-solid fa-rotate"></i> Refresh</button></div>
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>Time</th><th>Patient</th><th>Document</th><th>Doctor</th><th>Location</th><th>Status</th><th>Actions</th></tr></thead><tbody id="cBody"></tbody></table></div>
+      <div id="cEmpty"></div>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -46,39 +38,28 @@
   const user = Auth.requireRole(['receptionist']);
   if (user) {
     renderPortalLayout('check-in.html');
-    const patients = Object.fromEntries(DB.get(DB_KEYS.patients).map(p => [p.id, p]));
-    const doctors = Object.fromEntries(DB.get(DB_KEYS.doctors).map(d => [d.id, d]));
-    const FLOW = ['Confirmed', 'Waiting', 'In Consultation', 'Completed'];
+    (async () => {
+      try {
 
-    function render() {
-      const list = DB.get(DB_KEYS.appointments).filter(a => a.date === today() && a.status !== 'Cancelled' && a.status !== 'Pending').sort((a, b) => a.time.localeCompare(b.time));
-      const body = document.getElementById('ciBody');
-      const empty = document.getElementById('ciEmpty');
-      if (list.length === 0) { body.innerHTML = ''; emptyState(empty, 'fa-clipboard-check', 'No arrivals today', 'Confirmed appointments for today will appear here.'); return; }
-      empty.innerHTML = '';
-      body.innerHTML = list.map(a => {
-        const p = patients[a.patientId]; const d = doctors[a.doctorId];
-        const idx = FLOW.indexOf(a.status);
-        const next = FLOW[idx + 1];
-        return `<tr>
-          <td><div class="flex items-center gap-12"><img src="${p.photo}" class="avatar" style="width:34px;height:34px;" alt=""><span>${p.name}</span></div></td>
-          <td>${d.name}</td>
-          <td>${a.time}</td>
-          <td>${statusBadge(a.status)}</td>
-          <td class="table-actions">
-            ${next ? `<button class="btn btn-primary btn-sm advance-btn" data-id="${a.id}" data-next="${next}">Move to "${next}"</button>` : `<span class="text-muted" style="font-size:.82rem;">Visit complete</span>`}
-          </td>
-        </tr>`;
-      }).join('');
+      const sortCitas = (a, b) => (a.fecha + a.horaInicio).localeCompare(b.fecha + b.horaInicio);
+      const ACTIVAS = ['CONFIRMADA', 'REPROGRAMADA', 'CHECK_IN'];
 
-      qsa('.advance-btn').forEach(b => b.addEventListener('click', () => {
-        DB.update(DB_KEYS.appointments, b.dataset.id, { status: b.dataset.next });
-        addAuditLog(user.name, `Updated appointment status to ${b.dataset.next}`, 'Check-in');
-        toast(`Status updated to "${b.dataset.next}".`, 'success');
-        render();
-      }));
-    }
-    render();
+      const body = qs('#cBody'), empty = qs('#cEmpty');
+      let citas = [];
+      async function load() { skeletonRows(body, 4, 7); citas = (await Api.citas.agenda(today())).sort(sortCitas); render(); }
+      function render() {
+        const term = qs('#cSearch').value.toLowerCase().trim();
+        const list = citas.filter(c => !term || (c.paciente + ' ' + c.documentoPaciente).toLowerCase().includes(term));
+        if (!list.length) { body.innerHTML = ''; emptyState(empty, 'fa-clipboard-check', 'No patients to check in', 'There are no appointments for today.'); return; }
+        empty.innerHTML = '';
+        body.innerHTML = list.map(c => `<tr><td>${fmtTime(c.horaInicio)}</td><td>${esc(c.paciente)}</td><td>${esc(c.documentoPaciente)}</td><td>${esc(c.medico)}</td><td>${esc(c.numeroPabellon)} · ${esc(c.codigoRoom)}</td><td>${estadoBadge(c.estado)}</td>
+          <td class="table-actions">${['CONFIRMADA', 'REPROGRAMADA'].includes(c.estado) ? `<button class="btn btn-success btn-sm" data-id="${c.idCita}"><i class="fa-solid fa-clipboard-check"></i> Check-in</button>` : ''}</td></tr>`).join('');
+      }
+      body.addEventListener('click', (e) => { const b = e.target.closest('button[data-id]'); if (b) safe(async () => { await Api.citas.checkIn(b.dataset.id); toast('Patient checked in.', 'success'); await load(); }); });
+      qs('#cSearch').addEventListener('input', debounce(render, 150)); qs('#cReload').addEventListener('click', () => safe(load));
+      await load();
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

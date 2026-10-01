@@ -19,40 +19,18 @@
     <div id="topbar-mount"></div>
     <div class="content-area">
       <div class="content-header">
-        <div><h1 id="welcomeMsg">Welcome back!</h1><p>Here's your schedule and patient activity for today.</p></div>
-        <a href="consultation.html" class="btn btn-primary"><i class="fa-solid fa-notes-medical"></i> Register Consultation</a>
+        <div><h1 id="pageTitle">Welcome back!</h1><p id="pageSub">Your day at a glance.</p></div>
+        
       </div>
-
       <div class="dashboard-grid" id="statsGrid"></div>
-
-      <div class="two-col">
-        <div class="card">
-          <div class="flex justify-between items-center" style="margin-bottom:14px;">
-            <h4 style="margin:0;">Today's Schedule</h4>
-            <a href="agenda.html" style="font-size:.85rem;font-weight:600;">View agenda</a>
-          </div>
-          <div id="todaySchedule"></div>
-        </div>
-        <div>
-          <div class="card" style="margin-bottom:22px;">
-            <h4 style="margin-bottom:14px;">Quick Actions</h4>
-            <div class="flex" style="flex-direction:column;gap:10px;">
-              <a href="consultation.html" class="btn btn-outline btn-block"><i class="fa-solid fa-notes-medical"></i> Register Consultation</a>
-              <a href="agenda.html" class="btn btn-outline btn-block"><i class="fa-solid fa-calendar-days"></i> View Agenda</a>
-              <a href="patients.html" class="btn btn-outline btn-block"><i class="fa-solid fa-users"></i> My Patients</a>
-            </div>
-          </div>
-          <div class="card">
-            <div class="flex justify-between items-center" style="margin-bottom:14px;"><h4 style="margin:0;">Notifications</h4><a href="notifications.html" style="font-size:.85rem;font-weight:600;">View all</a></div>
-            <div id="notifList"></div>
-          </div>
-        </div>
-      </div>
+      <div class="card"><div class="flex justify-between items-center" style="margin-bottom:14px;"><h4 style="margin:0;">Today's Patients</h4><a href="agenda.html" style="font-size:.85rem;font-weight:600;">Open agenda</a></div>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>Time</th><th>Patient</th><th>Document</th><th>Specialty</th><th>Location</th><th>Status</th><th></th></tr></thead><tbody id="tBody"></tbody></table></div><div id="tEmpty"></div></div>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -60,46 +38,23 @@
   const user = Auth.requireRole(['doctor']);
   if (user) {
     renderPortalLayout('dashboard.html');
-    document.getElementById('welcomeMsg').textContent = 'Welcome back, ' + user.name.split(' ')[0] + '!';
+    (async () => {
+      try {
 
-    const doctorId = user.doctorId;
-    const appts = DB.get(DB_KEYS.appointments).filter(a => a.doctorId === doctorId);
-    const patients = Object.fromEntries(DB.get(DB_KEYS.patients).map(p => [p.id, p]));
-    const patientIds = new Set(appts.map(a => a.patientId));
+      const sortCitas = (a, b) => (a.fecha + a.horaInicio).localeCompare(b.fecha + b.horaInicio);
 
-    const todayAppts = appts.filter(a => a.date === today() && a.status !== 'Cancelled').sort((a, b) => a.time.localeCompare(b.time));
-    const completed = appts.filter(a => a.status === 'Completed');
-    const pending = appts.filter(a => a.status === 'Pending');
-    const cancelled = appts.filter(a => a.status === 'Cancelled');
-
-    document.getElementById('statsGrid').innerHTML = `
-      <div class="card stat-card"><div class="stat-icon blue"><i class="fa-solid fa-calendar-day"></i></div><div><div class="stat-value">${todayAppts.length}</div><div class="stat-label">Today's Appointments</div></div></div>
-      <div class="card stat-card"><div class="stat-icon teal"><i class="fa-solid fa-users"></i></div><div><div class="stat-value">${patientIds.size}</div><div class="stat-label">Total Patients</div></div></div>
-      <div class="card stat-card"><div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div><div><div class="stat-value">${completed.length}</div><div class="stat-label">Completed Consultations</div></div></div>
-      <div class="card stat-card"><div class="stat-icon amber"><i class="fa-solid fa-hourglass-half"></i></div><div><div class="stat-value">${pending.length}</div><div class="stat-label">Pending Appointments</div></div></div>`;
-
-    const scheduleBox = document.getElementById('todaySchedule');
-    if (todayAppts.length === 0) {
-      emptyState(scheduleBox, 'fa-calendar-xmark', 'No appointments today', 'Enjoy your day off, or check the agenda for upcoming visits.');
-    } else {
-      scheduleBox.innerHTML = todayAppts.map(a => {
-        const p = patients[a.patientId];
-        return `<div class="calendar-day-slot">
-          <div class="time">${a.time}</div>
-          <img src="${p.photo}" class="avatar-sm" style="border-radius:50%;object-fit:cover;width:34px;height:34px;" alt="">
-          <div style="flex:1;"><strong style="font-size:.9rem;">${p.name}</strong><div class="text-muted" style="font-size:.8rem;">${a.reason}</div></div>
-          ${statusBadge(a.status)}
-        </div>`;
-      }).join('');
-    }
-
-    const notifs = DB.get(DB_KEYS.notifications).filter(n => n.userId === user.id).slice(0, 4);
-    const notifList = document.getElementById('notifList');
-    if (notifs.length === 0) { emptyState(notifList, 'fa-bell-slash', 'No notifications', "You're all caught up!"); }
-    else {
-      notifList.innerHTML = notifs.map(n => `<div style="padding:10px 0;border-bottom:1px solid var(--color-border);">
-        <div style="font-weight:600;font-size:.87rem;">${n.title}</div><div class="text-muted" style="font-size:.8rem;">${n.message}</div></div>`).join('');
-    }
+      qs('#pageTitle').textContent = 'Welcome back, ' + user.name.split(' ')[0] + '!';
+      qs('#pageSub').textContent = "Your day at a glance.";
+      const citas = (await Api.citas.miAgenda(today())).sort(sortCitas);
+      const n = e => citas.filter(c => c.estado === e).length;
+      const card = (icon, color, v, l) => `<div class="card stat-card"><div class="stat-icon ${color}"><i class="fa-solid ${icon}"></i></div><div><div class="stat-value">${v}</div><div class="stat-label">${l}</div></div></div>`;
+      qs('#statsGrid').innerHTML = card('fa-calendar-day', 'blue', citas.length, "Today's Appointments") + card('fa-clipboard-check', 'teal', n('CHECK_IN'), 'Waiting (checked in)') +
+        card('fa-circle-check', 'green', n('ATENDIDA'), 'Attended') + card('fa-calendar-xmark', 'red', n('CANCELADA') + n('NO_ASISTIO'), 'Cancelled / no-show');
+      if (!citas.length) emptyState(qs('#tEmpty'), 'fa-calendar', 'No appointments today', 'Enjoy a quiet day.');
+      else qs('#tBody').innerHTML = citas.map(c => `<tr><td>${fmtTime(c.horaInicio)}</td><td>${esc(c.paciente)}</td><td>${esc(c.documentoPaciente)}</td><td>${esc(c.especialidad)}</td><td>${esc(c.numeroPabellon)} · ${esc(c.codigoRoom)}</td><td>${estadoBadge(c.estado)}</td>
+        <td class="table-actions">${c.estado === 'CHECK_IN' ? `<a class="btn btn-primary btn-sm" href="consultation.html?cita=${c.idCita}"><i class="fa-solid fa-notes-medical"></i> Start</a>` : ''}</td></tr>`).join('');
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

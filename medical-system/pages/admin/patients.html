@@ -18,16 +18,17 @@
   <div class="main-content">
     <div id="topbar-mount"></div>
     <div class="content-area">
-      <div class="content-header"><div><h1>Patient Management</h1><p>View and manage all registered patients.</p></div></div>
-
-      <div class="toolbar">
-        <div class="search-input"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="pSearch" placeholder="Search by name, National ID..."></div>
-        <select class="filter-select" id="pStatus"><option value="">All Statuses</option><option>Active</option><option>Inactive</option></select>
+      <div class="content-header">
+        <div><h1 id="pageTitle">Patient Management</h1><p id="pageSub">View and manage registered patients.</p></div>
+        
       </div>
-
+      <div class="toolbar">
+        <div class="search-input"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="pSearch" placeholder="Search by name, email or document..."></div>
+        <select class="filter-select" id="pStatus"><option value="">All Statuses</option><option value="1">Active</option><option value="0">Inactive</option></select>
+      </div>
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>Patient ID</th><th>Name</th><th>National ID</th><th>Phone</th><th>Registered</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Patient</th><th>Document</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody id="pBody"></tbody>
         </table>
       </div>
@@ -35,8 +36,16 @@
     </div>
   </div>
 </div>
+<div class="modal-overlay" id="detModal">
+  <div class="modal-box">
+    <div class="modal-header"><h3 id="modalTitle">Patient</h3><button class="modal-close" onclick="closeModal('detModal')">&times;</button></div>
+    <div class="modal-body"><div id="detailBox"></div></div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('detModal')">Close</button></div>
+  </div>
+</div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -44,46 +53,58 @@
   const user = Auth.requireRole(['admin']);
   if (user) {
     renderPortalLayout('patients.html');
+    (async () => {
+      try {
 
-    function render() {
-      const term = document.getElementById('pSearch').value.toLowerCase().trim();
-      const status = document.getElementById('pStatus').value;
-      const list = DB.get(DB_KEYS.patients)
-        .filter(p => !status || p.status === status)
-        .filter(p => !term || p.name.toLowerCase().includes(term) || p.nationalId.includes(term));
+      const body = qs('#pBody'), empty = qs('#pEmpty');
+      let patients = [];
+      const val = id => document.getElementById(id).value.trim();
 
-      const body = document.getElementById('pBody');
-      const empty = document.getElementById('pEmpty');
-      if (list.length === 0) { body.innerHTML = ''; emptyState(empty, 'fa-users', 'No patients found', 'Try a different search or filter.'); return; }
-      empty.innerHTML = '';
-      body.innerHTML = list.map(p => `
-        <tr>
-          <td>${p.id}</td>
-          <td><div class="flex items-center gap-12"><img src="${p.photo}" class="avatar" style="width:30px;height:30px;" alt=""><span>${p.name}</span></div></td>
-          <td>${p.nationalId}</td>
-          <td>${p.phone}</td>
-          <td>${formatDate(p.registered)}</td>
-          <td>${statusBadge(p.status)}</td>
-          <td class="table-actions">
-            <button class="btn btn-outline btn-sm toggle-btn" data-id="${p.id}">${p.status === 'Active' ? 'Deactivate' : 'Activate'}</button>
-          </td>
-        </tr>`).join('');
-
-      qsa('.toggle-btn').forEach(b => b.addEventListener('click', () => {
-        const p = DB.find(DB_KEYS.patients, b.dataset.id);
-        const newStatus = p.status === 'Active' ? 'Inactive' : 'Active';
-        DB.update(DB_KEYS.patients, p.id, { status: newStatus });
-        addAuditLog(user.name, (newStatus === 'Active' ? 'Activated' : 'Deactivated') + ' patient', 'Patients');
-        toast(`Patient ${newStatus === 'Active' ? 'activated' : 'deactivated'}.`, 'success');
+      async function load() {
+        skeletonRows(body, 4, 5);
+        patients = (await Api.usuarios.list()).filter(u => u.rol === 'PACIENTE');
         render();
-      }));
-    }
-
-    ['pSearch', 'pStatus'].forEach(id => {
-      document.getElementById(id).addEventListener('input', debounce(render, 150));
-      document.getElementById(id).addEventListener('change', render);
-    });
-    render();
+      }
+      function render() {
+        const term = val('pSearch').toLowerCase(), st = val('pStatus');
+        const list = patients
+          .filter(p => st === '' || String(p.activo ? 1 : 0) === st)
+          .filter(p => !term || (fullName(p) + ' ' + p.correo + ' ' + p.documentoIdentidad).toLowerCase().includes(term));
+        if (list.length === 0) { body.innerHTML = ''; emptyState(empty, 'fa-users', 'No patients found', 'Patients register themselves from the app or at the front desk.'); return; }
+        empty.innerHTML = '';
+        body.innerHTML = list.map(p => `
+          <tr>
+            <td><div class="flex items-center gap-12"><span class="avatar-sm">${initials(fullName(p))}</span><span>${esc(fullName(p))}</span></div></td>
+            <td>${esc(p.documentoIdentidad)}</td><td>${esc(p.correo)}</td><td>${activoBadge(p.activo)}</td>
+            <td class="table-actions">
+              <button class="btn btn-outline btn-sm" data-act="view" data-id="${p.idUsuario}" data-tooltip="Details"><i class="fa-solid fa-eye"></i></button>
+              <button class="btn btn-outline btn-sm" data-act="toggle" data-id="${p.idUsuario}" data-tooltip="${p.activo ? 'Deactivate' : 'Activate'}"><i class="fa-solid ${p.activo ? 'fa-user-slash' : 'fa-user-check'}"></i></button>
+            </td>
+          </tr>`).join('');
+      }
+      body.addEventListener('click', async (e) => {
+        const b = e.target.closest('button[data-act]'); if (!b) return;
+        const p = patients.find(x => String(x.idUsuario) === b.dataset.id); if (!p) return;
+        if (b.dataset.act === 'toggle') {
+          await safe(async () => { await Api.usuarios.estado(p.idUsuario, !p.activo); toast(`Patient ${p.activo ? 'deactivated' : 'activated'}.`, 'success'); await load(); });
+        } else {
+          await safe(async () => {
+            const d = await Api.pacientes.buscar(p.documentoIdentidad);
+            qs('#modalTitle').textContent = fullName(p);
+            qs('#detailBox').innerHTML = `<table class="data-table" style="min-width:0;"><tbody>
+              <tr><td style="font-weight:600;">Document ID</td><td>${esc(d.documentoIdentidad)}</td></tr>
+              <tr><td style="font-weight:600;">Email</td><td>${esc(d.correo)}</td></tr>
+              <tr><td style="font-weight:600;">Phone</td><td>${esc(d.telefonoContacto || '—')}</td></tr>
+              <tr><td style="font-weight:600;">Insurance</td><td>${esc(d.tipoSeguro || '—')}</td></tr>
+              <tr><td style="font-weight:600;">Guardian data</td><td>${esc(d.datosApoderado || '—')}</td></tr></tbody></table>`;
+            openModal('detModal');
+          });
+        }
+      });
+      ['pSearch', 'pStatus'].forEach(id => { document.getElementById(id).addEventListener('input', debounce(render, 150)); document.getElementById(id).addEventListener('change', render); });
+      await load();
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

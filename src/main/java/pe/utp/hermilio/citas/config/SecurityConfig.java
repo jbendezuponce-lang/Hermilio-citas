@@ -2,6 +2,7 @@ package pe.utp.hermilio.citas.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -46,6 +47,9 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/auth/login", "/api/auth/registro",
                                                                 "/api/auth/recuperar-password",
                                                                 "/api/auth/restablecer-password")
+                                                .permitAll()
+                                                // Catálogos de solo lectura para las páginas públicas (especialidades y médicos activos)
+                                                .requestMatchers(HttpMethod.GET, "/api/especialidades", "/api/medicos")
                                                 .permitAll()
                                                 .anyRequest().authenticated())
                                 .exceptionHandling(e -> e

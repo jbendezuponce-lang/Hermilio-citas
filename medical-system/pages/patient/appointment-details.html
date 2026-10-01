@@ -18,75 +18,55 @@
   <div class="main-content">
     <div id="topbar-mount"></div>
     <div class="content-area">
-      <div class="breadcrumbs">
-        <a href="appointments.html">My Appointments</a><span class="sep">/</span><span class="current">Details</span>
+      <div class="content-header">
+        <div><h1 id="pageTitle">Appointment Details</h1><p id="pageSub">Full information about your visit.</p></div>
+        
       </div>
-      <div id="detailsWrap"></div>
+<div id="detBox"></div>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
 <script>
   const user = Auth.requireRole(['patient']);
   if (user) {
-    renderPortalLayout('appointments.html');
-    const id = new URLSearchParams(window.location.search).get('id');
-    const appt = DB.find(DB_KEYS.appointments, id);
-    const wrap = document.getElementById('detailsWrap');
+    renderPortalLayout('appointment-details.html');
+    (async () => {
+      try {
 
-    if (!appt || appt.patientId !== user.patientId) {
-      emptyState(wrap, 'fa-calendar-xmark', 'Appointment not found', 'This appointment does not exist or is not yours.');
-    } else {
-      const doc = DB.find(DB_KEYS.doctors, appt.doctorId);
-      const spec = DB.find(DB_KEYS.specialties, appt.specialtyId);
-      const loc = DB.find(DB_KEYS.locations, appt.locationId);
+      const specIcon = (n) => { n = (n || '').toLowerCase(); return n.includes('psiq') ? 'fa-brain' : n.includes('psic') ? 'fa-comments' : n.includes('pedi') ? 'fa-child-reaching' : n.includes('cardi') ? 'fa-heart-pulse' : 'fa-stethoscope'; };
+      const sortCitas = (a, b) => (a.fecha + a.horaInicio).localeCompare(b.fecha + b.horaInicio);
+      const ACTIVAS = ['CONFIRMADA', 'REPROGRAMADA', 'CHECK_IN'];
 
-      wrap.innerHTML = `
-        <div class="card" style="max-width:720px;">
-          <div class="flex justify-between items-start" style="margin-bottom:20px;">
-            <div>
-              <h2 style="margin-bottom:4px;">Appointment ${appt.id}</h2>
-              <p class="text-muted" style="margin:0;">Booked on ${formatDate(appt.createdAt)}</p>
-            </div>
-            ${statusBadge(appt.status)}
-          </div>
-          <div class="flex items-center gap-12" style="margin-bottom:20px;">
-            <img src="${doc.photo}" class="avatar" style="width:56px;height:56px;" alt="Portrait of ${doc.name}">
-            <div><strong>${doc.name}</strong><div class="text-muted" style="font-size:.85rem;">${spec.name}</div></div>
-          </div>
-          <table class="data-table" style="min-width:0;">
-            <tbody>
-              <tr><td style="font-weight:600;width:180px;">Date</td><td>${formatDateLong(appt.date)}</td></tr>
-              <tr><td style="font-weight:600;">Time</td><td>${appt.time}</td></tr>
-              <tr><td style="font-weight:600;">Consultation Type</td><td>${appt.type}</td></tr>
-              <tr><td style="font-weight:600;">Location</td><td>${loc.name}, ${loc.address}</td></tr>
-              <tr><td style="font-weight:600;">Reason</td><td>${appt.reason}</td></tr>
-            </tbody>
-          </table>
-          <div class="flex gap-12" style="margin-top:24px;flex-wrap:wrap;">
-            ${(appt.status === 'Confirmed' || appt.status === 'Pending') ? `
-              <a href="reschedule.html?id=${appt.id}" class="btn btn-outline"><i class="fa-solid fa-calendar-days"></i> Reschedule</a>
-              <button class="btn btn-danger" id="cancelBtn"><i class="fa-solid fa-xmark"></i> Cancel Appointment</button>` : ''}
-            <button class="btn btn-ghost" id="printBtn"><i class="fa-solid fa-print"></i> Print / Download Confirmation</button>
-          </div>
-        </div>`;
-
-      document.getElementById('cancelBtn')?.addEventListener('click', () => {
-        confirmDialog('Are you sure you want to cancel this appointment?', () => {
-          DB.update(DB_KEYS.appointments, appt.id, { status: 'Cancelled' });
-          addNotification(user.id, 'Appointment cancelled', `Your appointment ${appt.id} has been cancelled.`, 'appointment');
-          addAuditLog(user.name, 'Cancelled appointment', 'Appointments');
-          toast('Appointment cancelled.', 'success');
-          setTimeout(() => window.location.reload(), 700);
-        }, { danger: true, confirmText: 'Cancel Appointment' });
-      });
-
-      document.getElementById('printBtn')?.addEventListener('click', () => window.print());
-    }
+      const id = qparam('id'); const box = qs('#detBox');
+      if (!id) { emptyState(box, 'fa-calendar-xmark', 'Appointment not found', 'Open an appointment from “My Appointments”.'); return; }
+      const c = await Api.citas.obtener(id);
+      qs('#pageTitle').textContent = 'Appointment #' + c.idCita;
+      const editable = ['CONFIRMADA', 'REPROGRAMADA'].includes(c.estado) && c.fecha >= today();
+      box.innerHTML = `<div class="card" style="max-width:760px;">
+        <div class="flex items-center gap-16" style="margin-bottom:18px;"><span class="avatar-lg">${initials(c.medico)}</span>
+          <div style="flex:1;"><h3 style="margin:0;">${esc(c.medico)}</h3><div class="text-muted">${esc(c.especialidad)}</div></div>${estadoBadge(c.estado)}</div>
+        <table class="data-table" style="min-width:0;"><tbody>
+          <tr><td style="font-weight:600;">Date</td><td>${formatDateLong(c.fecha)}</td></tr>
+          <tr><td style="font-weight:600;">Time</td><td>${fmtTime(c.horaInicio)} – ${fmtTime(c.horaFin)}</td></tr>
+          <tr><td style="font-weight:600;">Location</td><td><i class="fa-solid fa-location-dot"></i> ${esc(c.numeroPabellon)} · room ${esc(c.codigoRoom)}</td></tr>
+          <tr><td style="font-weight:600;">Booked via</td><td>${c.origen === 'MOVIL' ? 'Mobile app / web' : 'Front desk'}</td></tr>
+          <tr><td style="font-weight:600;">Booked on</td><td>${formatDateTime(c.fechaHoraReserva)}</td></tr>
+          <tr><td style="font-weight:600;">Reschedules</td><td>${c.reprogramaciones}</td></tr></tbody></table>
+        <div class="flex gap-12" style="margin-top:20px;flex-wrap:wrap;">
+          <a href="appointments.html" class="btn btn-ghost"><i class="fa-solid fa-arrow-left"></i> Back</a>
+          ${editable ? `<a href="reschedule.html?id=${c.idCita}" class="btn btn-outline"><i class="fa-solid fa-calendar-days"></i> Reschedule</a><button class="btn btn-danger" id="cancelBtn"><i class="fa-solid fa-xmark"></i> Cancel appointment</button>` : ''}
+        </div></div>`;
+      qs('#cancelBtn')?.addEventListener('click', () => confirmDialog('Cancel this appointment?', () => safe(async () => {
+        await Api.citas.cancelar(c.idCita); toast('Appointment cancelled.', 'success'); setTimeout(() => location.href = 'appointments.html', 800);
+      }), { danger: true, confirmText: 'Cancel appointment' }));
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

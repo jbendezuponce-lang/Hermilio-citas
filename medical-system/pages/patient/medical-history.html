@@ -18,22 +18,17 @@
   <div class="main-content">
     <div id="topbar-mount"></div>
     <div class="content-area">
-      <div class="content-header"><div><h1>Medical History</h1><p>A complete timeline of your consultations and treatments.</p></div></div>
-
-      <div class="toolbar">
-        <select class="filter-select" id="filterSpec"><option value="">All Specialties</option></select>
-        <select class="filter-select" id="filterDoc"><option value="">All Doctors</option></select>
-        <input type="date" id="filterDate" class="filter-select">
+      <div class="content-header">
+        <div><h1 id="pageTitle">Medical History</h1><p id="pageSub">Your consultations, diagnoses and treatments.</p></div>
+        
       </div>
-
-      <div class="card">
-        <div class="timeline" id="historyTimeline"></div>
-      </div>
+      <div id="histBox"></div>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -41,44 +36,23 @@
   const user = Auth.requireRole(['patient']);
   if (user) {
     renderPortalLayout('medical-history.html');
-    const specialties = DB.get(DB_KEYS.specialties);
-    const doctors = Object.fromEntries(DB.get(DB_KEYS.doctors).map(d => [d.id, d]));
-    const specMap = Object.fromEntries(specialties.map(s => [s.id, s.name]));
+    (async () => {
+      try {
 
-    document.getElementById('filterSpec').innerHTML += specialties.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-    document.getElementById('filterDoc').innerHTML += DB.get(DB_KEYS.doctors).map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-
-    function render() {
-      const spec = document.getElementById('filterSpec').value;
-      const doc = document.getElementById('filterDoc').value;
-      const date = document.getElementById('filterDate').value;
-
-      const consultations = DB.get(DB_KEYS.consultations)
-        .filter(c => c.patientId === user.patientId)
-        .filter(c => !spec || c.specialtyId === spec)
-        .filter(c => !doc || c.doctorId === doc)
-        .filter(c => !date || c.date === date)
-        .sort((a, b) => b.date.localeCompare(a.date));
-
-      const timeline = document.getElementById('historyTimeline');
-      if (consultations.length === 0) {
-        emptyState(timeline, 'fa-file-waveform', 'No medical records found', 'Records will appear here after a completed consultation.');
-        return;
-      }
-      timeline.innerHTML = consultations.map(c => {
-        const d = doctors[c.doctorId];
-        return `<div class="timeline-item">
-          <div class="timeline-date">${formatDateLong(c.date)}</div>
-          <h4 style="margin:6px 0 4px;">${c.diagnosis}</h4>
-          <p style="margin-bottom:8px;">${d.name} · ${specMap[c.specialtyId]}</p>
-          <p style="margin-bottom:10px;font-size:.88rem;"><strong>Treatment:</strong> ${c.treatment}</p>
-          <a href="consultation-details.html?id=${c.id}" class="btn btn-outline btn-sm">View Full Details</a>
-        </div>`;
-      }).join('');
-    }
-
-    ['filterSpec', 'filterDoc', 'filterDate'].forEach(id => document.getElementById(id).addEventListener('change', render));
-    render();
+      const box = qs('#histBox');
+      const hist = await Api.historiales.mios();
+      if (!hist.length) { emptyState(box, 'fa-file-waveform', 'No medical records yet', 'Your doctor will add a record after each consultation.'); return; }
+      box.innerHTML = '<div class="timeline">' + hist.map(h => `
+        <div class="timeline-item"><div class="timeline-date">${formatDate(h.fechaCita)}</div>
+          <div class="card" style="margin-bottom:16px;">
+            <div class="flex justify-between items-center" style="margin-bottom:8px;"><div><strong>${esc(h.medico)}</strong> <span class="text-muted">· ${esc(h.especialidad)}</span></div>
+              <a class="btn btn-outline btn-sm" href="consultation-details.html?id=${h.idHistorial}">View details</a></div>
+            <p style="margin:6px 0;"><strong>Diagnosis:</strong> ${esc(h.diagnostico || '—')}</p>
+            <p style="margin:6px 0;"><strong>Treatment:</strong> ${esc(h.tratamiento)}</p>
+            ${(h.recetas || []).length ? `<p style="margin:6px 0;"><strong>Prescriptions:</strong> ${h.recetas.map(r => esc(r.medicamento) + ' (' + esc(r.dosis) + ')').join(', ')}</p>` : ''}
+          </div></div>`).join('') + '</div>';
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

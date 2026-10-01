@@ -19,32 +19,38 @@
     <div id="topbar-mount"></div>
     <div class="content-area">
       <div class="content-header">
-        <div><h1>Location Management</h1><p>Manage medical centers, clinics and consultation rooms.</p></div>
+        <div><h1 id="pageTitle">Location Management</h1><p id="pageSub">Pavilions and consulting rooms where appointments take place.</p></div>
         <button class="btn btn-primary" id="newBtn"><i class="fa-solid fa-plus"></i> Add Location</button>
       </div>
-      <div class="grid grid-3" id="locGrid"></div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Pavilion</th><th>Room code</th><th>Actions</th></tr></thead>
+          <tbody id="lBody"></tbody>
+        </table>
+      </div>
+      <div id="lEmpty"></div>
     </div>
   </div>
 </div>
-
 <div class="modal-overlay" id="locModal">
   <div class="modal-box">
     <div class="modal-header"><h3 id="modalTitle">Add Location</h3><button class="modal-close" onclick="closeModal('locModal')">&times;</button></div>
     <div class="modal-body">
       <input type="hidden" id="editId">
-      <div class="form-group"><label for="fName">Name</label><input type="text" id="fName"></div>
-      <div class="form-group"><label for="fAddress">Address</label><input type="text" id="fAddress"></div>
-      <div class="form-group"><label for="fPhone">Phone</label><input type="tel" id="fPhone"></div>
-      <div class="form-group"><label for="fRooms">Consultation Rooms (comma separated)</label><input type="text" id="fRooms" placeholder="Room 101, Room 102"></div>
+      <div class="form-row">
+        <div class="form-group"><label for="fPab">Pavilion <span class="req">*</span></label><input type="text" id="fPab" maxlength="20" placeholder="Pabellón A"></div>
+        <div class="form-group"><label for="fRoom">Room code <span class="req">*</span></label><input type="text" id="fRoom" maxlength="20" placeholder="A-101"></div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('locModal')">Cancel</button>
-      <button class="btn btn-primary" id="saveBtn">Save Location</button>
+      <button class="btn btn-primary" id="saveBtn">Save</button>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -52,66 +58,39 @@
   const user = Auth.requireRole(['admin']);
   if (user) {
     renderPortalLayout('locations.html');
-    const doctors = DB.get(DB_KEYS.doctors);
+    (async () => {
+      try {
 
-    function render() {
-      const list = DB.get(DB_KEYS.locations);
-      document.getElementById('locGrid').innerHTML = list.map(l => {
-        const assigned = doctors.filter(d => d.locationId === l.id).length;
-        return `<div class="card">
-          <div class="spec-icon"><i class="fa-solid fa-hospital"></i></div>
-          <h4>${l.name}</h4>
-          <p style="font-size:.85rem;"><i class="fa-solid fa-location-dot"></i> ${l.address}</p>
-          <p style="font-size:.85rem;"><i class="fa-solid fa-phone"></i> ${l.phone}</p>
-          <p style="font-size:.85rem;"><i class="fa-solid fa-door-open"></i> ${l.rooms.length} rooms · ${assigned} doctors assigned</p>
-          <div class="flex gap-8" style="margin-top:12px;">
-            <button class="btn btn-outline btn-sm edit-btn" data-id="${l.id}"><i class="fa-solid fa-pen"></i> Edit</button>
-            <button class="btn btn-danger btn-sm del-btn" data-id="${l.id}"><i class="fa-solid fa-trash"></i></button>
-          </div>
-        </div>`;
-      }).join('');
-
-      qsa('.edit-btn').forEach(b => b.addEventListener('click', () => {
-        const l = DB.find(DB_KEYS.locations, b.dataset.id);
-        document.getElementById('modalTitle').textContent = 'Edit Location';
-        document.getElementById('editId').value = l.id;
-        document.getElementById('fName').value = l.name;
-        document.getElementById('fAddress').value = l.address;
-        document.getElementById('fPhone').value = l.phone;
-        document.getElementById('fRooms').value = l.rooms.join(', ');
-        openModal('locModal');
-      }));
-      qsa('.del-btn').forEach(b => b.addEventListener('click', () => {
-        confirmDialog('Delete this location?', () => {
-          DB.remove(DB_KEYS.locations, b.dataset.id);
-          addAuditLog(user.name, 'Deleted location', 'Locations');
-          toast('Location deleted.', 'success');
-          render();
-        }, { danger: true, confirmText: 'Delete' });
-      }));
-    }
-
-    document.getElementById('newBtn').addEventListener('click', () => {
-      document.getElementById('modalTitle').textContent = 'Add Location';
-      ['editId', 'fName', 'fAddress', 'fPhone', 'fRooms'].forEach(id => document.getElementById(id).value = '');
-      openModal('locModal');
-    });
-
-    document.getElementById('saveBtn').addEventListener('click', () => {
-      const id = document.getElementById('editId').value;
-      const name = document.getElementById('fName').value.trim();
-      if (!name) { toast('Name is required.', 'error'); return; }
-      const data = {
-        name, address: document.getElementById('fAddress').value.trim(), phone: document.getElementById('fPhone').value.trim(),
-        rooms: document.getElementById('fRooms').value.split(',').map(r => r.trim()).filter(Boolean)
-      };
-      if (id) { DB.update(DB_KEYS.locations, id, data); addAuditLog(user.name, 'Updated location', 'Locations'); toast('Location updated!', 'success'); }
-      else { DB.insert(DB_KEYS.locations, { id: 'loc-' + Date.now(), ...data }); addAuditLog(user.name, 'Created location', 'Locations'); toast('Location created!', 'success'); }
-      closeModal('locModal');
-      render();
-    });
-
-    render();
+      const body = qs('#lBody'), empty = qs('#lEmpty');
+      let locs = [];
+      const val = id => document.getElementById(id).value.trim();
+      async function load() {
+        skeletonRows(body, 3, 3);
+        locs = await Api.consultorios.list();
+        if (locs.length === 0) { body.innerHTML = ''; emptyState(empty, 'fa-location-dot', 'No locations yet', 'Add the first consulting room.'); return; }
+        empty.innerHTML = '';
+        body.innerHTML = locs.map(l => `
+          <tr><td><strong>${esc(l.numeroPabellon)}</strong></td><td>${esc(l.codigoRoom)}</td>
+            <td class="table-actions"><button class="btn btn-outline btn-sm" data-id="${l.idConsultorio}" data-tooltip="Edit"><i class="fa-solid fa-pen"></i></button></td></tr>`).join('');
+      }
+      qs('#newBtn').addEventListener('click', () => { qs('#modalTitle').textContent = 'Add Location'; ['editId', 'fPab', 'fRoom'].forEach(i => document.getElementById(i).value = ''); openModal('locModal'); });
+      body.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-id]'); if (!b) return;
+        const l = locs.find(x => String(x.idConsultorio) === b.dataset.id); if (!l) return;
+        qs('#modalTitle').textContent = 'Edit Location'; qs('#editId').value = l.idConsultorio;
+        qs('#fPab').value = l.numeroPabellon; qs('#fRoom').value = l.codigoRoom; openModal('locModal');
+      });
+      qs('#saveBtn').addEventListener('click', async () => {
+        if (!val('fPab') || !val('fRoom')) { toast('Pavilion and room code are required.', 'error'); return; }
+        const payload = { numeroPabellon: val('fPab'), codigoRoom: val('fRoom') }, id = val('editId');
+        await safe(async () => {
+          if (id) await Api.consultorios.update(id, payload); else await Api.consultorios.create(payload);
+          toast('Location saved.', 'success'); closeModal('locModal'); await load();
+        });
+      });
+      await load();
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

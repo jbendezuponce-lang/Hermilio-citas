@@ -20,7 +20,7 @@ import pe.utp.hermilio.citas.service.HistorialService;
 
 import java.util.List;
 
-/** RF-28 y RF-29. Solo el rol MEDICO accede al historial clínico (RNF-02). */
+/** RF-28 y RF-29. El MEDICO lee y escribe el historial; el PACIENTE solo lee el suyo (RNF-02). */
 @RestController
 @RequestMapping("/api/historiales")
 @PreAuthorize("hasRole('MEDICO')")
@@ -44,6 +44,13 @@ public class HistorialController {
     public HistorialResponse actualizar(@AuthenticationPrincipal UsuarioDetails actor, @PathVariable Long id,
                                         @Valid @RequestBody HistorialActualizarRequest request) {
         return historialService.actualizar(actor, id, request);
+    }
+
+    /** El paciente consulta su propio historial (solo lectura). El @PreAuthorize del método sustituye al de la clase. 200. */
+    @GetMapping("/mios")
+    @PreAuthorize("hasRole('PACIENTE')")
+    public List<HistorialResponse> mios(@AuthenticationPrincipal UsuarioDetails actor) {
+        return historialService.historialPropio(actor);
     }
 
     /** RF-28. 200 | 404. */

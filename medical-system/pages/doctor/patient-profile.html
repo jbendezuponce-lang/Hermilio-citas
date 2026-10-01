@@ -18,101 +18,81 @@
   <div class="main-content">
     <div id="topbar-mount"></div>
     <div class="content-area">
-      <div class="breadcrumbs"><a href="patients.html">Patients</a><span class="sep">/</span><span class="current">Profile</span></div>
-      <div id="wrap"></div>
+      <div class="content-header">
+        <div><h1 id="pageTitle">Patient Record</h1><p id="pageSub">Personal data and clinical history (access is logged, RNF-14).</p></div>
+        
+      </div>
+      <div id="pInfo" style="margin-bottom:22px;"></div>
+      <h3>Clinical history</h3><div id="histBox"></div>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="editModal">
+  <div class="modal-box modal-lg">
+    <div class="modal-header"><h3 id="editModalTitle">Edit clinical record</h3><button class="modal-close" onclick="closeModal('editModal')">&times;</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="eId">
+      <div class="form-group"><label for="eDx">Diagnosis</label><textarea id="eDx" rows="2"></textarea></div>
+      <div class="form-group"><label for="eTx">Treatment / indications <span class="req">*</span></label><textarea id="eTx" rows="3"></textarea></div>
+      <div class="form-group"><label for="eObs">Observations</label><textarea id="eObs" rows="2"></textarea></div>
+      <p class="form-hint">Only the doctor who attended the appointment can edit its record.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('editModal')">Cancel</button>
+      <button class="btn btn-primary" id="eSave">Save changes</button>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
 <script>
   const user = Auth.requireRole(['doctor']);
   if (user) {
-    renderPortalLayout('patients.html');
-    const id = new URLSearchParams(window.location.search).get('id');
-    const p = DB.find(DB_KEYS.patients, id);
-    const wrap = document.getElementById('wrap');
+    renderPortalLayout('patient-profile.html');
+    (async () => {
+      try {
 
-    if (!p) { emptyState(wrap, 'fa-user-slash', 'Patient not found', 'This patient record does not exist.'); }
-    else {
-      const consultations = DB.get(DB_KEYS.consultations).filter(c => c.patientId === p.id).sort((a, b) => b.date.localeCompare(a.date));
-      const docs = DB.get(DB_KEYS.documents).filter(d => d.patientId === p.id);
-      const specMap = Object.fromEntries(DB.get(DB_KEYS.specialties).map(s => [s.id, s.name]));
+      const sortCitas = (a, b) => (a.fecha + a.horaInicio).localeCompare(b.fecha + b.horaInicio);
 
-      wrap.innerHTML = `
-        <div class="two-col">
-          <div>
-            <div class="card" style="margin-bottom:20px;">
-              <div class="flex items-center gap-16">
-                <img src="${p.photo}" class="avatar-lg" style="width:80px;height:80px;" alt="">
-                <div>
-                  <h3 style="margin-bottom:2px;">${p.name}</h3>
-                  <p class="text-muted" style="margin:0;">ID: ${p.id} · National ID: ${p.nationalId}</p>
-                </div>
-              </div>
-              <div class="grid grid-2" style="margin-top:20px;">
-                <div><h4>Date of Birth</h4><p>${formatDate(p.dob)}</p></div>
-                <div><h4>Gender</h4><p>${p.gender}</p></div>
-                <div><h4>Phone</h4><p>${p.phone}</p></div>
-                <div><h4>Email</h4><p>${p.email}</p></div>
-                <div><h4>Blood Type</h4><p>${p.bloodType}</p></div>
-                <div><h4>Allergies</h4><p>${p.allergies.join(', ')}</p></div>
-              </div>
-            </div>
-
-            <div class="card">
-              <h4>Consultation History</h4>
-              <div class="timeline" style="margin-top:16px;">
-                ${consultations.length ? consultations.map(c => `
-                  <div class="timeline-item">
-                    <div class="timeline-date">${formatDateLong(c.date)}</div>
-                    <h4 style="margin:6px 0 4px;">${c.diagnosis}</h4>
-                    <p style="font-size:.88rem;margin-bottom:8px;">${specMap[c.specialtyId]}</p>
-                    <a href="#" class="btn btn-outline btn-sm view-consult" data-id="${c.id}">View Full Details</a>
-                  </div>`).join('') : '<p class="text-muted">No consultation history yet.</p>'}
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <div class="card" style="margin-bottom:20px;">
-              <a href="consultation.html?patient=${p.id}" class="btn btn-primary btn-block"><i class="fa-solid fa-notes-medical"></i> Start Consultation</a>
-            </div>
-            <div class="card">
-              <h4>Medical Documents</h4>
-              ${docs.length ? docs.map(d => `
-                <div style="padding:10px 0;border-bottom:1px solid var(--color-border);font-size:.88rem;">
-                  <i class="fa-solid fa-file-pdf" style="color:var(--color-danger);margin-right:6px;"></i>${d.name}
-                  <div class="text-muted" style="font-size:.78rem;">${d.type} · ${formatDate(d.date)}</div>
-                </div>`).join('') : '<p class="text-muted">No documents available.</p>'}
-            </div>
-          </div>
-        </div>
-
-        <div class="modal-overlay" id="consultModal">
-          <div class="modal-box modal-lg">
-            <div class="modal-header"><h3>Consultation Details</h3><button class="modal-close" onclick="closeModal('consultModal')">&times;</button></div>
-            <div class="modal-body" id="consultModalBody"></div>
-          </div>
-        </div>`;
-
-      qsa('.view-consult').forEach(btn => btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const c = consultations.find(x => x.id === btn.dataset.id);
-        document.getElementById('consultModalBody').innerHTML = `
-          <p><strong>Reason:</strong> ${c.reason}</p>
-          <p><strong>Symptoms:</strong> ${c.symptoms}</p>
-          <p><strong>Diagnosis:</strong> ${c.diagnosis}</p>
-          <p><strong>Treatment:</strong> ${c.treatment}</p>
-          <p><strong>Medications:</strong> ${c.medications.join(', ')}</p>
-          <p><strong>Recommendations:</strong> ${c.recommendations}</p>
-          <p><strong>Notes:</strong> ${c.notes}</p>`;
-        openModal('consultModal');
+      const box = qs('#histBox');
+      const modalEdit = () => qs('#editModal');
+      let records = [];
+      function renderHist() {
+        if (!records.length) { emptyState(box, 'fa-file-waveform', 'No clinical records', 'No consultations have been recorded for this patient yet.'); return; }
+        box.innerHTML = '<div class="timeline">' + records.map(h => `
+          <div class="timeline-item"><div class="timeline-date">${formatDate(h.fechaCita)}</div>
+            <div class="card" style="margin-bottom:16px;"><div class="flex justify-between items-center" style="margin-bottom:8px;"><div><strong>${esc(h.medico)}</strong> <span class="text-muted">· ${esc(h.especialidad)}</span></div>
+              <button class="btn btn-outline btn-sm" data-id="${h.idHistorial}"><i class="fa-solid fa-pen"></i> Edit</button></div>
+              <p style="margin:6px 0;"><strong>Diagnosis:</strong> ${esc(h.diagnostico || '—')}</p><p style="margin:6px 0;"><strong>Treatment:</strong> ${esc(h.tratamiento)}</p>
+              <p style="margin:6px 0;"><strong>Observations:</strong> ${esc(h.observaciones || '—')}</p>
+              ${(h.recetas || []).length ? `<p style="margin:6px 0;"><strong>Prescriptions:</strong> ${h.recetas.map(r => esc(r.medicamento) + ' (' + esc(r.dosis) + ')').join(', ')}</p>` : ''}</div></div>`).join('') + '</div>';
+      }
+      async function loadHist(idPaciente) { box.innerHTML = ''; records = await Api.historiales.delPaciente(idPaciente); renderHist(); }
+      box.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-id]'); if (!b) return;
+        const h = records.find(x => String(x.idHistorial) === b.dataset.id);
+        qs('#eId').value = h.idHistorial; qs('#eDx').value = h.diagnostico || ''; qs('#eTx').value = h.tratamiento || ''; qs('#eObs').value = h.observaciones || ''; openModal('editModal');
+      });
+      qs('#eSave').addEventListener('click', () => safe(async () => {
+        if (!qs('#eTx').value.trim()) { toast('Treatment / indications are required.', 'error'); return; }
+        await Api.historiales.actualizar(qs('#eId').value, { diagnostico: qs('#eDx').value.trim() || null, tratamiento: qs('#eTx').value.trim(), observaciones: qs('#eObs').value.trim() || null, recetas: null });
+        toast('Record updated.', 'success'); closeModal('editModal'); await loadHist(window.__pacienteId);
       }));
-    }
+
+      const doc = qparam('doc'); if (!doc) { emptyState(qs('#pInfo'), 'fa-user-slash', 'No patient selected', 'Search a patient in “Patients”.'); return; }
+      const p = await Api.pacientes.buscar(doc); window.__pacienteId = p.idPaciente;
+      qs('#pageTitle').textContent = fullName(p);
+      qs('#pInfo').innerHTML = `<div class="card" style="max-width:760px;"><table class="data-table" style="min-width:0;"><tbody>
+        <tr><td style="font-weight:600;width:160px;">Document ID</td><td>${esc(p.documentoIdentidad)}</td></tr><tr><td style="font-weight:600;">Email</td><td>${esc(p.correo)}</td></tr>
+        <tr><td style="font-weight:600;">Phone</td><td>${esc(p.telefonoContacto || '—')}</td></tr><tr><td style="font-weight:600;">Insurance</td><td>${esc(p.tipoSeguro || '—')}</td></tr>
+        <tr><td style="font-weight:600;">Guardian data</td><td>${esc(p.datosApoderado || '—')}</td></tr></tbody></table></div>`;
+      await loadHist(p.idPaciente);
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

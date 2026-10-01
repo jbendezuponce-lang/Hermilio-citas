@@ -98,6 +98,17 @@ public class HistorialService {
         return historial;
     }
 
+    /** El paciente autenticado consulta su propio historial clínico (solo lectura), del más reciente al más antiguo. */
+    @Transactional
+    public List<HistorialResponse> historialPropio(UsuarioDetails actor) {
+        var paciente = pacienteRepository.findByUsuarioId(actor.getId())
+                .orElseThrow(() -> new NotFoundException("No existe un perfil de paciente para el usuario"));
+        List<HistorialResponse> historial = historialRepository.findByPaciente(paciente.getId()).stream()
+                .map(DtoMapper::historial).toList();
+        auditoriaService.registrar(actor.getId(), "CONSULTA_HISTORIAL_PROPIO paciente=" + paciente.getId());
+        return historial;
+    }
+
     private void exigirMedicoDeLaCita(UsuarioDetails actor, Cita cita) {
         if (!cita.getHorario().getMedico().getUsuario().getId().equals(actor.getId())) {
             throw new ForbiddenOperationException("Solo el médico que atiende la cita puede registrar su historial");

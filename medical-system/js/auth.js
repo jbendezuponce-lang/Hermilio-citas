@@ -1,39 +1,27 @@
 /* ==========================================================================
-   auth.js — Real Authentication connecting to Spring Boot Backend
+   auth.js — Autenticación real contra el backend Spring Boot (JWT)
+   Requiere js/api.js (define API_BASE_URL y Api) cargado antes.
    ========================================================================== */
-
-const API_BASE_URL = 'http://localhost:8080/api';
 
 const Auth = {
   async login(email, password) {
     try {
-      // 1. Petición al backend enviando correo y password
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ correo: email, password: password }) // Coincide con tu AuthDto.java
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ correo: email, password: password })
       });
-
       if (!response.ok) {
         const err = await readError(response);
-        if (response.status === 401) {
-          return { ok: false, message: 'Correo o contraseña inválidos, o la cuenta está inactiva.' };
-        }
+        if (response.status === 401) return { ok: false, message: 'Correo o contraseña inválidos, o la cuenta está inactiva.' };
         return { ok: false, message: err.message || ('Error del servidor (' + response.status + ').') };
       }
-
-      // 2. Extraer respuesta (el backend debe devolver el token JWT y datos del usuario)
       const data = await response.json();
-      
-      // Guardamos el token en localStorage para enviarlo en futuras peticiones
       localStorage.setItem('token', data.token);
+      localStorage.setItem('token_exp', String(Date.now() + (data.expiraEnSegundos || 3600) * 1000));
 
-      // 3. Mapear los roles del Backend (Español) a los roles del Frontend (Inglés) para las rutas
+      const backendRole = data.rol || 'PACIENTE';
       let frontendRole = 'patient';
-      // Si tu backend devuelve "ROLE_ADMINISTRADOR" o "ADMINISTRADOR", lo adaptamos:
-      const backendRole = data.rol || 'PACIENTE'; 
       if (backendRole.includes('ADMINISTRADOR')) frontendRole = 'admin';
       else if (backendRole.includes('MEDICO')) frontendRole = 'doctor';
       else if (backendRole.includes('RECEPCIONISTA')) frontendRole = 'receptionist';
@@ -41,43 +29,56 @@ const Auth = {
       const session = {
         email: email,
         role: frontendRole,
-        name: data.nombres || 'Usuario', // Ajusta según tu DTO
+        rol: backendRole,
+        name: ((data.nombres || '') + ' ' + (data.apellidos || '')).trim() || 'Usuario',
         id: data.idUsuario
       };
-      
-      // Guardar la sesión para mantener la compatibilidad con tu HTML
       localStorage.setItem('session', JSON.stringify(session));
       return { ok: true, user: session };
-      
     } catch (error) {
-      console.error("Error de conexión:", error);
+      console.error('Error de conexión:', error);
       return { ok: false, message: 'El servidor backend no está respondiendo.' };
     }
   },
 
   logout() {
-    localStorage.removeItem('session');
-    localStorage.removeItem('token'); // Destruimos el JWT del navegador
+    // Invalida el token en el servidor (RF-15) sin bloquear la salida
+    const token = localStorage.getItem('token');
+    if (token) {
+      try { fetch(`${API_BASE_URL}/auth/logout`, { method: 'POST', headers: { Authorization: 'Bearer ' + token }, keepalive: true }); } catch (e) { /* ignorar */ }
+    }
+    this.clear();
     window.location.href = getBasePath() + 'pages/auth/login.html';
   },
 
-  currentUser() {
-    try { 
-      return JSON.parse(localStorage.getItem('session')); 
-    } catch (e) { 
-      return null; 
-    }
+  clear() {
+    ['session', 'token', 'token_exp'].forEach(k => localStorage.removeItem(k));
   },
 
-  isLoggedIn() {
-    return !!this.currentUser() && !!localStorage.getItem('token');
+  /** Sesión vencida o token rechazado por el servidor. */
+  expire() {
+    this.clear();
+    window.location.href = getBasePath() + 'pages/auth/login.html?expired=1';
   },
+
+  tokenVigente() {
+    const t = localStorage.getItem('token');
+    const exp = parseInt(localStorage.getItem('token_exp') || '0', 10);
+    return !!t && Date.now() < exp;
+  },
+
+  currentUser() {
+    if (!this.tokenVigente()) return null;
+    try { return JSON.parse(localStorage.getItem('session')); } catch (e) { return null; }
+  },
+
+  isLoggedIn() { return !!this.currentUser(); },
 
   requireRole(roles) {
     const user = this.currentUser();
     const basePath = getBasePath();
-    
     if (!user) {
+      this.clear();
       window.location.href = basePath + 'pages/auth/login.html';
       return null;
     }
@@ -94,7 +95,7 @@ const Auth = {
   },
 
   async register(patientData) {
-    // Los nombres de los campos deben coincidir EXACTAMENTE con RegistroPacienteRequest.java (camelCase).
+    // Los nombres de los campos deben coincidir con RegistroPacienteRequest.java
     try {
       const response = await fetch(`${API_BASE_URL}/auth/registro`, {
         method: 'POST',
@@ -108,13 +109,10 @@ const Auth = {
           telefonoContacto: (patientData.phone || '').trim()
         })
       });
-
       if (!response.ok) {
         const err = await readError(response);
         let msg = err.message || 'Error al registrar.';
-        if (Array.isArray(err.detalles) && err.detalles.length) {
-          msg += ' ' + err.detalles.join(' | ');
-        }
+        if (Array.isArray(err.detalles) && err.detalles.length) msg += ' ' + err.detalles.join(' | ');
         return { ok: false, message: msg };
       }
       return { ok: true };

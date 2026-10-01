@@ -67,7 +67,7 @@ mvn test
 Usan H2 en modo MySQL (`src/test/resources/application.properties`). Cubren: relaciones JPA e integridad (5), reglas de citas (13) y seguridad/contratos HTTP (14).
 
 ## Endpoints
-Todos bajo `/api`, JSON, `Authorization: Bearer <token>` salvo los públicos. Errores con formato `ApiError` (`timestamp, status, error, message, path, details`).
+Todos bajo `/api`, JSON, `Authorization: Bearer <token>` salvo los públicos. Errores con formato `ApiError` (`timestamp, status, error, message, path, detalles`).
 
 | Recurso | Endpoints (rol) |
 |---|---|
@@ -77,16 +77,39 @@ Todos bajo `/api`, JSON, `Authorization: Bearer <token>` salvo los públicos. Er
 | Citas | `POST /citas` (PACIENTE) · `POST /citas/presencial` (RECEP.) · `GET /citas/mias` · `GET /citas/agenda` (RECEP./ADMIN) · `GET /citas/agenda/mia` (MÉDICO) · `GET /citas/{id}` · `PUT /citas/{id}/reprogramar` · `PATCH /citas/{id}/cancelar` · `PATCH .../check-in` (RECEP.) · `PATCH .../atender` (MÉDICO) · `PATCH .../no-asistio` (RECEP./MÉDICO) |
 | Lista de espera (RECEP.) | `POST` · `GET` · `PATCH /lista-espera/{id}/atender` · `DELETE /lista-espera/{id}` |
 | Triaje | `POST /triajes` · `GET /triajes/cita/{idCita}` (RECEP./MÉDICO) |
-| Historial (MÉDICO) | `POST /historiales` · `PUT /historiales/{id}` · `GET /historiales/paciente/{idPaciente}` |
+| Historial | `POST /historiales` · `PUT /historiales/{id}` · `GET /historiales/paciente/{idPaciente}` (MÉDICO) · `GET /historiales/mios` (PACIENTE, solo lectura) |
 | Notificaciones (PACIENTE) | `GET /notificaciones/mias` · `PATCH /notificaciones/{id}/leida` |
-| Catálogos | `GET /especialidades` · `POST/PUT/DELETE /especialidades[/{id}]` (ADMIN) · `GET /medicos` · `GET/POST/PUT /consultorios` |
+| Catálogos | `GET /especialidades` y `GET /medicos` (**públicos**, alimentan las páginas públicas) · `POST/PUT/DELETE /especialidades[/{id}]` (ADMIN) · `GET/POST/PUT /consultorios` |
 | Usuarios (ADMIN) | `GET/POST /usuarios` · `GET/PUT /usuarios/{id}` · `PATCH /usuarios/{id}/estado` |
 | Reportes (ADMIN) | `GET /reportes/citas?desde&hasta` · `GET /reportes/inasistencia?desde&hasta[&especialidadId]` · `GET /auditoria?desde&hasta[&usuarioId]` |
 
 Códigos habituales: 400 validación/regla de negocio · 401 sin token o token inválido · 403 rol o propiedad · 404 no existe · 409 conflicto (horario ocupado, cita duplicada RF-35, estado inválido) · 500 error inesperado (sin detalles internos).
 
+## Frontend web (carpeta `medical-system/`)
+Todas las pantallas leen y escriben **en MySQL a través de esta API** (`js/api.js` es el cliente REST con JWT). Ya no se usa `localStorage` para guardar datos de negocio; solo guarda el token de sesión.
+
+**Cómo usarlo**
+1. Arranque el backend (`mvn clean spring-boot:run`, puerto 8080).
+2. Abra `medical-system/index.html` con la extensión *Live Server* de VS Code, o ejecute `python -m http.server 5500` dentro de `medical-system/` y abra `http://localhost:5500`. (Abrirlo con doble clic, como `file://`, también funciona porque CORS está habilitado.)
+3. Si el backend corre en otra dirección, ejecute en la consola del navegador `localStorage.setItem('apiBase','http://HOST:PUERTO/api')`.
+
+**Cuentas demo** (se crean/reparan al arrancar mientras `SEED_DEMO_USERS=true`; contraseña `admin123`): `admin@`, `medico@`, `recepcion@`, `paciente@hermilio.com`. Con las cuentas demo se siembran además 2 consultorios y franjas de 30 min del médico demo para los próximos 14 días hábiles, de modo que se puede reservar una cita desde el primer arranque.
+
+**Qué hace cada rol**
+| Rol | Pantallas conectadas |
+|---|---|
+| Administrador | Usuarios, Doctores, Pacientes, Especialidades, Ubicaciones (consultorios), **Schedules** (genera franjas de atención por médico/fecha), Reportes (citas y absentismo, CSV), Auditoría, Dashboard |
+| Paciente | Reservar (especialidad → fecha → hora), Mis citas (ver, reprogramar, cancelar), Historial clínico, Recetas, Notificaciones, Perfil |
+| Recepción | Agenda diaria, cita presencial, reprogramar/cancelar presenciales, check-in, no-asistió, lista de espera, registro y búsqueda de pacientes |
+| Médico | Agenda, consulta (triaje + historial + recetas + marcar atendida), historial por paciente (editable), horario semanal |
+| Público | Inicio, Especialidades, Médicos y perfil (catálogos públicos), Recuperar contraseña (flujo real con token) |
+
+**Importante:** un paciente solo puede reservar si existen franjas libres. Al crear un médico nuevo, genere sus horarios en *Admin → Schedules*.
+
+**Sin soporte en el backend (por eso no aparecen):** fotos/valoraciones/años de experiencia de los médicos, documentos adjuntos (las recetas se muestran como "Prescriptions"), notificaciones para médico/recepción (el backend solo notifica al paciente) y cambio de contraseña desde Ajustes (se usa "Reset password").
+
 ## Seguridad
 JWT sin estado, RBAC por rol, contraseñas con BCrypt, logout con lista negra de tokens en memoria (con varias instancias, sustitúyala por almacén compartido), respuesta uniforme en recuperación de contraseña, auditoría de accesos y cambios clínicos (RNF-14). **RNF-03:** habilite HTTPS (`server.ssl.*` o proxy inverso) y `sslMode=REQUIRED` en `DB_URL` en producción.
 
 ## Fuera de alcance del backend (declarado)
-Aplicación móvil/web (front-end), envío real de correo/SMS/push (hay un `NotificadorCorreo` que solo registra en log), backups (RNF-15) y alta disponibilidad (RNF-16) son de infraestructura.
+Aplicación móvil nativa, envío real de correo/SMS/push (hay un `NotificadorCorreo` que solo registra en log), backups (RNF-15) y alta disponibilidad (RNF-16) son de infraestructura.

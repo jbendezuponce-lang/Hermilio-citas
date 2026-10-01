@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Schedules | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/dashboard.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div id="topbar-mount"></div>
+    <div class="content-area">
+      <div class="content-header">
+        <div><h1 id="pageTitle">Schedules</h1><p id="pageSub">Create and manage the time slots that patients can book.</p></div>
+        <button class="btn btn-primary" id="newBtn"><i class="fa-solid fa-calendar-plus"></i> Generate Slots</button>
+      </div>
+      <div class="toolbar">
+        <select class="filter-select" id="sDoc"></select>
+        <div class="form-group" style="margin:0;"><input type="date" id="sFrom" aria-label="From"></div>
+        <div class="form-group" style="margin:0;"><input type="date" id="sTo" aria-label="To"></div>
+        <select class="filter-select" id="sStatus"><option value="">All slots</option><option value="1">Available</option><option value="0">Booked</option></select>
+        <button class="btn btn-outline" id="sGo"><i class="fa-solid fa-rotate"></i> Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Date</th><th>Time</th><th>Shift</th><th>Doctor</th><th>Specialty</th><th>Location</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="sBody"></tbody>
+        </table>
+      </div>
+      <div id="sEmpty"></div>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="genModal">
+  <div class="modal-box modal-lg">
+    <div class="modal-header"><h3 id="modalTitle">Generate Time Slots</h3><button class="modal-close" onclick="closeModal('genModal')">&times;</button></div>
+    <div class="modal-body">
+      <p class="text-muted" style="margin-top:0;">Creates consecutive time slots for the selected doctor. Patients can only book slots that exist here.</p>
+      <div class="form-row">
+        <div class="form-group"><label for="gDoc">Doctor <span class="req">*</span></label><select id="gDoc"></select></div>
+        <div class="form-group"><label for="gLoc">Location <span class="req">*</span></label><select id="gLoc"></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label for="gFrom">From date <span class="req">*</span></label><input type="date" id="gFrom"></div>
+        <div class="form-group"><label for="gTo">To date <span class="req">*</span></label><input type="date" id="gTo"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label for="gStart">Start time <span class="req">*</span></label><input type="time" id="gStart" value="08:00"></div>
+        <div class="form-group"><label for="gEnd">End time <span class="req">*</span></label><input type="time" id="gEnd" value="12:00"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label for="gLen">Slot length</label><select id="gLen"><option value="20">20 minutes</option><option value="30" selected>30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option></select></div>
+        <div class="form-group"><label>&nbsp;</label><div class="checkbox-row" style="height:42px;"><input type="checkbox" id="gWeek" checked><label for="gWeek">Weekdays only (Mon–Fri)</label></div></div>
+      </div>
+      <div id="gMsg" class="form-hint"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('genModal')">Cancel</button>
+      <button class="btn btn-primary" id="genBtn">Create Slots</button>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  const user = Auth.requireRole(['admin']);
+  if (user) {
+    renderPortalLayout('schedules.html');
+    (async () => {
+      try {
+
+      const body = qs('#sBody'), empty = qs('#sEmpty');
+      const val = id => document.getElementById(id).value;
+      const [medicos, locs] = await Promise.all([Api.medicos.list(), Api.consultorios.list()]);
+      if (medicos.length === 0) { emptyState(empty, 'fa-user-doctor', 'No active doctors', 'Create a doctor first (Doctors → Add Doctor).'); return; }
+      if (locs.length === 0) { emptyState(empty, 'fa-location-dot', 'No locations', 'Create a consulting room first (Locations → Add Location).'); return; }
+      const docOpts = medicos.map(m => `<option value="${m.idMedico}">${esc(fullName(m))} — ${esc(m.especialidad)}</option>`).join('');
+      qs('#sDoc').innerHTML = docOpts; qs('#gDoc').innerHTML = docOpts;
+      qs('#gLoc').innerHTML = locs.map(l => `<option value="${l.idConsultorio}">${esc(l.numeroPabellon)} · ${esc(l.codigoRoom)}</option>`).join('');
+      qs('#sFrom').value = today(); qs('#sTo').value = addDays(14);
+      qs('#gFrom').value = addDays(1); qs('#gTo').value = addDays(14);
+      let rows = [];
+
+      async function load() {
+        skeletonRows(body, 4, 8);
+        rows = await Api.horarios.porMedico(val('sDoc'), val('sFrom'), val('sTo'));
+        render();
+      }
+      function render() {
+        const st = val('sStatus');
+        const list = rows.filter(h => st === '' || String(h.disponible ? 1 : 0) === st);
+        if (list.length === 0) { body.innerHTML = ''; emptyState(empty, 'fa-clock', 'No time slots', 'Use “Generate Slots” to create availability for this doctor.'); return; }
+        empty.innerHTML = '';
+        body.innerHTML = list.map(h => `
+          <tr><td>${formatDate(h.fecha)}</td><td>${fmtTime(h.horaInicio)} – ${fmtTime(h.horaFin)}</td><td>${h.turno === 'MANANA' ? 'Morning' : 'Afternoon'}</td>
+            <td>${esc(h.medico)}</td><td>${esc(h.especialidad)}</td><td>${esc(h.numeroPabellon)} · ${esc(h.codigoRoom)}</td>
+            <td><span class="badge ${h.disponible ? 'badge-green' : 'badge-amber'}">${h.disponible ? 'Available' : 'Booked'}</span></td>
+            <td class="table-actions"><button class="btn btn-danger btn-sm" data-id="${h.idHorario}" data-tooltip="Delete"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
+      }
+      body.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-id]'); if (!b) return;
+        confirmDialog('Delete this time slot? Slots with active appointments cannot be deleted.', () => safe(async () => {
+          await Api.horarios.remove(b.dataset.id); toast('Time slot deleted.', 'success'); await load();
+        }), { danger: true, confirmText: 'Delete' });
+      });
+      ['sDoc', 'sFrom', 'sTo'].forEach(id => document.getElementById(id).addEventListener('change', () => safe(load)));
+      qs('#sStatus').addEventListener('change', render);
+      qs('#sGo').addEventListener('click', () => safe(load));
+      qs('#newBtn').addEventListener('click', () => { qs('#gDoc').value = val('sDoc'); qs('#gMsg').textContent = ''; openModal('genModal'); });
+
+      const toMin = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+      const hhmm = n => String(Math.floor(n / 60)).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0');
+      qs('#genBtn').addEventListener('click', async () => {
+        const from = val('gFrom'), to = val('gTo'), len = Number(val('gLen'));
+        if (!from || !to || from > to) { toast('Check the date range.', 'error'); return; }
+        if (!val('gStart') || !val('gEnd') || toMin(val('gStart')) >= toMin(val('gEnd'))) { toast('Check the start and end times.', 'error'); return; }
+        const slots = [];
+        for (let t = toMin(val('gStart')); t + len <= toMin(val('gEnd')); t += len) slots.push([hhmm(t), hhmm(t + len)]);
+        if (slots.length === 0) { toast('The time range is shorter than one slot.', 'error'); return; }
+        const days = [];
+        for (let d = from; d <= to; d = addDays(1, d)) {
+          const wd = new Date(d + 'T00:00:00').getDay();
+          if (!qs('#gWeek').checked || (wd !== 0 && wd !== 6)) days.push(d);
+        }
+        if (days.length * slots.length > 400) { toast('Too many slots at once (max. 400). Reduce the date range.', 'error'); return; }
+        const btn = qs('#genBtn'); btn.disabled = true;
+        let ok = 0, skipped = 0, firstError = '', n = 0; const total = days.length * slots.length;
+        for (const d of days) for (const [a, b] of slots) {
+          n++; qs('#gMsg').textContent = `Creating slots… ${n}/${total}`;
+          try { await Api.horarios.create({ idMedico: Number(val('gDoc')), idConsultorio: Number(val('gLoc')), fecha: d, horaInicio: a, horaFin: b }); ok++; }
+          catch (e) { skipped++; if (!firstError) firstError = e.message; }
+        }
+        btn.disabled = false; qs('#gMsg').textContent = '';
+        toast(`${ok} slot(s) created${skipped ? `, ${skipped} skipped` : ''}.${skipped && firstError ? ' ' + firstError : ''}`, ok ? 'success' : 'error', 7000);
+        closeModal('genModal'); qs('#sDoc').value = val('gDoc'); qs('#sFrom').value = from; qs('#sTo').value = to; await load();
+      });
+      await load();
+      } catch (e) { fail(e); }
+    })();
+  }
+</script>
+</body>
+</html>

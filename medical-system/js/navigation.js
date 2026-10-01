@@ -38,6 +38,7 @@ const NAV_ITEMS = {
     { label: 'Patients', icon: 'fa-users', href: 'patients.html' },
     { label: 'Specialties', icon: 'fa-stethoscope', href: 'specialties.html' },
     { label: 'Locations', icon: 'fa-location-dot', href: 'locations.html' },
+    { label: 'Schedules', icon: 'fa-clock', href: 'schedules.html' },
     { label: 'Reports', icon: 'fa-chart-line', href: 'reports.html' },
     { label: 'Audit Logs', icon: 'fa-list-check', href: 'audit-logs.html' }
   ]
@@ -49,7 +50,7 @@ function renderPortalLayout(activeHref) {
   const user = Auth.currentUser();
   if (!user) return;
   const items = NAV_ITEMS[user.role] || [];
-  const unreadCount = DB.get(DB_KEYS.notifications).filter(n => n.userId === user.id && !n.read).length;
+  const unreadCount = 0; // se completa de forma asíncrona (solo pacientes)
 
   const sidebarHtml = `
     <aside class="sidebar" id="sidebar">
@@ -98,8 +99,17 @@ function renderPortalLayout(activeHref) {
   if (sidebarMount) sidebarMount.innerHTML = sidebarHtml;
   if (topbarMount) topbarMount.innerHTML = topbarHtml;
 
+  // Notificaciones sin leer (el backend las expone solo para el paciente)
+  if (user.role === 'patient' && typeof Api !== 'undefined') {
+    Api.notificaciones.mias().then(list => {
+      const n = list.filter(x => !x.leido).length;
+      const bell = document.querySelector('.topbar-actions .icon-btn');
+      if (bell && n > 0 && !bell.querySelector('.badge-dot')) bell.insertAdjacentHTML('beforeend', `<span class="badge-dot">${n}</span>`);
+    }).catch(() => { /* sin conexión: no se muestra el contador */ });
+  }
+
   // Interactions
-  const doLogout = (e) => { e.preventDefault(); Auth.logout(); window.location.href = '../../index.html'; };
+  const doLogout = (e) => { e.preventDefault(); Auth.logout(); };
   document.getElementById('logoutBtn')?.addEventListener('click', doLogout);
   document.getElementById('logoutBtn2')?.addEventListener('click', doLogout);
 

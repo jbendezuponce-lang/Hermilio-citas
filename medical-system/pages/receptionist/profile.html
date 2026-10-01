@@ -18,19 +18,17 @@
   <div class="main-content">
     <div id="topbar-mount"></div>
     <div class="content-area">
-      <div class="content-header"><div><h1>My Profile</h1><p>Update your account information.</p></div></div>
-      <div class="card" style="max-width:520px;">
-        <form id="profileForm" novalidate>
-          <div class="form-group"><label for="name">Full Name</label><input type="text" id="name"></div>
-          <div class="form-group"><label for="email">Email</label><input type="email" id="email"></div>
-          <button type="submit" class="btn btn-primary">Save Changes</button>
-        </form>
+      <div class="content-header">
+        <div><h1 id="pageTitle">My Profile</h1><p id="pageSub">Your account information.</p></div>
+        
       </div>
+<div class="card" style="max-width:640px;"><table class="data-table" style="min-width:0;"><tbody id="pBody"></tbody></table><p class="text-muted" style="margin-top:14px;">To change your data, ask an administrator (Users).</p></div>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -38,20 +36,11 @@
   const user = Auth.requireRole(['receptionist']);
   if (user) {
     renderPortalLayout('profile.html');
-    document.getElementById('name').value = user.name;
-    document.getElementById('email').value = user.email;
-    document.getElementById('profileForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      const name = document.getElementById('name').value.trim();
-      const email = document.getElementById('email').value.trim();
-      if (!name) { toast('Name is required.', 'error'); return; }
-      if (!isValidEmail(email)) { toast('Enter a valid email.', 'error'); return; }
-      DB.update(DB_KEYS.users, user.id, { name, email });
-      const session = Auth.currentUser(); session.name = name; session.email = email;
-      localStorage.setItem(DB_KEYS.session, JSON.stringify(session));
-      toast('Profile updated successfully!', 'success');
-      setTimeout(() => window.location.reload(), 700);
-    });
+    (async () => {
+      try {
+      qs('#pBody').innerHTML = `<tr><td style="font-weight:600;width:150px;">Name</td><td>${esc(user.name)}</td></tr><tr><td style="font-weight:600;">Email</td><td>${esc(user.email)}</td></tr><tr><td style="font-weight:600;">Role</td><td>${rolBadge(user.rol)}</td></tr>`;
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

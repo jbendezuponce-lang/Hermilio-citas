@@ -19,15 +19,16 @@
     <div id="topbar-mount"></div>
     <div class="content-area">
       <div class="content-header">
-        <div><h1>Notifications</h1><p>Stay up to date with your appointments and records.</p></div>
-        <button class="btn btn-outline" id="markAllBtn">Mark all as read</button>
+        <div><h1 id="pageTitle">Notifications</h1><p id="pageSub">System messages.</p></div>
+        
       </div>
-      <div class="card" id="notifWrap"></div>
+<div id="nBox"></div>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -35,39 +36,11 @@
   const user = Auth.requireRole(['doctor']);
   if (user) {
     renderPortalLayout('notifications.html');
-    const iconMap = { appointment: 'fa-calendar-check', document: 'fa-file-medical', schedule: 'fa-clock', system: 'fa-gear' };
-
-    function render() {
-      const notifs = DB.get(DB_KEYS.notifications).filter(n => n.userId === user.id).sort((a, b) => b.date.localeCompare(a.date));
-      const wrap = document.getElementById('notifWrap');
-      if (notifs.length === 0) { emptyState(wrap, 'fa-bell-slash', 'No notifications', "You're all caught up!"); return; }
-      wrap.innerHTML = notifs.map(n => `
-        <div class="flex items-start justify-between" style="padding:16px 4px;border-bottom:1px solid var(--color-border);gap:14px;">
-          <div class="flex items-start gap-12">
-            <div class="stat-icon ${n.read ? 'blue' : 'teal'}" style="width:40px;height:40px;font-size:1rem;"><i class="fa-solid ${iconMap[n.type] || 'fa-bell'}"></i></div>
-            <div>
-              <div style="font-weight:700;font-size:.92rem;">${n.title}</div>
-              <div class="text-muted" style="font-size:.86rem;">${n.message}</div>
-              <div class="text-muted" style="font-size:.76rem;margin-top:4px;">${formatDate(n.date)}</div>
-            </div>
-          </div>
-          <div class="flex gap-8">
-            ${!n.read ? `<button class="btn btn-outline btn-sm read-btn" data-id="${n.id}">Mark read</button>` : ''}
-            <button class="btn btn-ghost btn-sm delete-btn" data-id="${n.id}"><i class="fa-solid fa-trash"></i></button>
-          </div>
-        </div>`).join('');
-
-      qsa('.read-btn').forEach(b => b.addEventListener('click', () => { DB.update(DB_KEYS.notifications, b.dataset.id, { read: true }); render(); }));
-      qsa('.delete-btn').forEach(b => b.addEventListener('click', () => { DB.remove(DB_KEYS.notifications, b.dataset.id); toast('Notification deleted.', 'success'); render(); }));
-    }
-
-    document.getElementById('markAllBtn').addEventListener('click', () => {
-      DB.get(DB_KEYS.notifications).filter(n => n.userId === user.id).forEach(n => DB.update(DB_KEYS.notifications, n.id, { read: true }));
-      toast('All notifications marked as read.', 'success');
-      render();
-    });
-
-    render();
+    (async () => {
+      try {
+      emptyState(qs('#nBox'), 'fa-bell-slash', 'No notifications', 'Appointment confirmations and reminders are sent to patients. Staff alerts are not used in this version.');
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

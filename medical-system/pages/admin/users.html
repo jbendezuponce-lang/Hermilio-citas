@@ -19,19 +19,17 @@
     <div id="topbar-mount"></div>
     <div class="content-area">
       <div class="content-header">
-        <div><h1>User Management</h1><p>Manage all platform users and their roles.</p></div>
-        <button class="btn btn-primary" id="newUserBtn"><i class="fa-solid fa-user-plus"></i> Create User</button>
+        <div><h1 id="pageTitle">User Management</h1><p id="pageSub">Create and manage accounts and roles.</p></div>
+        <button class="btn btn-primary" id="newBtn"><i class="fa-solid fa-user-plus"></i> Add User</button>
       </div>
-
       <div class="toolbar">
-        <div class="search-input"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="uSearch" placeholder="Search by name or email..."></div>
-        <select class="filter-select" id="uRole"><option value="">All Roles</option><option value="admin">Administrator</option><option value="doctor">Doctor</option><option value="receptionist">Receptionist</option><option value="patient">Patient</option></select>
-        <select class="filter-select" id="uStatus"><option value="">All Statuses</option><option>Active</option><option>Inactive</option></select>
+        <div class="search-input"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="uSearch" placeholder="Search by name, email or document..."></div>
+        <select class="filter-select" id="uRole"><option value="">All Roles</option><option value="PACIENTE">Patient</option><option value="RECEPCIONISTA">Receptionist</option><option value="MEDICO">Doctor</option><option value="ADMINISTRADOR">Administrator</option></select>
+        <select class="filter-select" id="uStatus"><option value="">All Statuses</option><option value="1">Active</option><option value="0">Inactive</option></select>
       </div>
-
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Registered</th><th>Last Activity</th><th>Actions</th></tr></thead>
+          <thead><tr><th>User</th><th>Document</th><th>Email</th><th>Role</th><th>Details</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody id="uBody"></tbody>
         </table>
       </div>
@@ -39,17 +37,29 @@
     </div>
   </div>
 </div>
-
 <div class="modal-overlay" id="userModal">
-  <div class="modal-box">
-    <div class="modal-header"><h3 id="modalTitle">Create User</h3><button class="modal-close" onclick="closeModal('userModal')">&times;</button></div>
+  <div class="modal-box modal-lg">
+    <div class="modal-header"><h3 id="modalTitle">Add User</h3><button class="modal-close" onclick="closeModal('userModal')">&times;</button></div>
     <div class="modal-body">
       <input type="hidden" id="editId">
-      <div class="form-group"><label for="fName">Full Name</label><input type="text" id="fName"></div>
-      <div class="form-group"><label for="fEmail">Email</label><input type="email" id="fEmail"></div>
-      <div class="form-group"><label for="fRole">Role</label>
-        <select id="fRole"><option value="patient">Patient</option><option value="doctor">Doctor</option><option value="receptionist">Receptionist</option><option value="admin">Administrator</option></select>
+      <div class="form-row">
+        <div class="form-group"><label for="fNombres">First names <span class="req">*</span></label><input type="text" id="fNombres" maxlength="100"></div>
+        <div class="form-group"><label for="fApellidos">Last names <span class="req">*</span></label><input type="text" id="fApellidos" maxlength="100"></div>
       </div>
+      <div class="form-row">
+        <div class="form-group"><label for="fDoc">Document ID (8-15 chars) <span class="req">*</span></label><input type="text" id="fDoc" maxlength="15"></div>
+        <div class="form-group"><label for="fCorreo">Email <span class="req">*</span></label><input type="email" id="fCorreo" maxlength="150"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" id="gPass"><label for="fPass">Password (min. 8) <span class="req">*</span></label><input type="password" id="fPass" maxlength="72" autocomplete="new-password"></div>
+        <div class="form-group"><label for="fRol">Role <span class="req">*</span></label>
+          <select id="fRol"><option value="RECEPCIONISTA">Receptionist</option><option value="MEDICO">Doctor</option><option value="ADMINISTRADOR">Administrator</option></select></div>
+      </div>
+      <div class="form-row" id="rowMedico">
+        <div class="form-group"><label for="fEsp">Specialty <span class="req">*</span></label><select id="fEsp"></select></div>
+        <div class="form-group"><label for="fCol">Professional license no. <span class="req">*</span></label><input type="text" id="fCol" maxlength="20" placeholder="CMP-12345"></div>
+      </div>
+      <div class="form-group" id="rowCargo"><label for="fCargo">Position</label><input type="text" id="fCargo" maxlength="80" placeholder="e.g. Recepcionista Principal"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('userModal')">Cancel</button>
@@ -59,6 +69,7 @@
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -66,95 +77,114 @@
   const user = Auth.requireRole(['admin']);
   if (user) {
     renderPortalLayout('users.html');
-    const roleLabels = { admin: 'Administrator', doctor: 'Doctor', receptionist: 'Receptionist', patient: 'Patient' };
-    const roleBadge = { admin: 'badge-purple', doctor: 'badge-blue', receptionist: 'badge-teal', patient: 'badge-gray' };
+    (async () => {
+      try {
 
-    function render() {
-      const term = document.getElementById('uSearch').value.toLowerCase().trim();
-      const role = document.getElementById('uRole').value;
-      const status = document.getElementById('uStatus').value;
-      const list = DB.get(DB_KEYS.users)
-        .filter(u => !role || u.role === role)
-        .filter(u => !status || u.status === status)
-        .filter(u => !term || u.name.toLowerCase().includes(term) || u.email.toLowerCase().includes(term));
+      const body = qs('#uBody'), empty = qs('#uEmpty');
+      let users = [], specs = [];
+      const val = id => document.getElementById(id).value.trim();
 
-      const body = document.getElementById('uBody');
-      const empty = document.getElementById('uEmpty');
-      if (list.length === 0) { body.innerHTML = ''; emptyState(empty, 'fa-user-gear', 'No users found', 'Try a different search or filter.'); return; }
-      empty.innerHTML = '';
-      body.innerHTML = list.map(u => `
-        <tr>
-          <td><div class="flex items-center gap-12"><span class="avatar-sm">${initials(u.name)}</span><span>${u.name}</span></div></td>
-          <td>${u.email}</td>
-          <td><span class="badge ${roleBadge[u.role]}">${roleLabels[u.role]}</span></td>
-          <td>${statusBadge(u.status)}</td>
-          <td>${formatDate(u.registered)}</td>
-          <td>${formatDate(u.lastActivity)}</td>
-          <td class="table-actions">
-            <button class="btn btn-outline btn-sm edit-btn" data-id="${u.id}" data-tooltip="Edit"><i class="fa-solid fa-pen"></i></button>
-            <button class="btn btn-outline btn-sm toggle-btn" data-id="${u.id}" data-tooltip="${u.status === 'Active' ? 'Deactivate' : 'Activate'}"><i class="fa-solid ${u.status === 'Active' ? 'fa-user-slash' : 'fa-user-check'}"></i></button>
-            <button class="btn btn-outline btn-sm reset-btn" data-id="${u.id}" data-tooltip="Reset password"><i class="fa-solid fa-key"></i></button>
-          </td>
-        </tr>`).join('');
-
-      qsa('.edit-btn').forEach(b => b.addEventListener('click', () => {
-        const u = DB.find(DB_KEYS.users, b.dataset.id);
-        document.getElementById('modalTitle').textContent = 'Edit User';
-        document.getElementById('editId').value = u.id;
-        document.getElementById('fName').value = u.name;
-        document.getElementById('fEmail').value = u.email;
-        document.getElementById('fRole').value = u.role;
-        openModal('userModal');
-      }));
-      qsa('.toggle-btn').forEach(b => b.addEventListener('click', () => {
-        const u = DB.find(DB_KEYS.users, b.dataset.id);
-        const newStatus = u.status === 'Active' ? 'Inactive' : 'Active';
-        DB.update(DB_KEYS.users, u.id, { status: newStatus });
-        addAuditLog(user.name, (newStatus === 'Active' ? 'Activated' : 'Deactivated') + ' user account', 'Users');
-        toast(`User ${newStatus === 'Active' ? 'activated' : 'deactivated'}.`, 'success');
+      async function load() {
+        skeletonRows(body, 4, 7);
+        [users, specs] = await Promise.all([Api.usuarios.list(), Api.especialidades.list()]);
+        qs('#fEsp').innerHTML = specs.map(s => `<option value="${s.idEspecialidad}">${esc(s.nombreEspecialidad)}</option>`).join('');
         render();
-      }));
-      qsa('.reset-btn').forEach(b => b.addEventListener('click', () => {
-        confirmDialog('Send a password reset link to this user? (simulated)', () => {
-          addAuditLog(user.name, 'Reset user password', 'Users');
-          toast('Password reset link sent (simulated).', 'success');
-        });
-      }));
-    }
-
-    document.getElementById('newUserBtn').addEventListener('click', () => {
-      document.getElementById('modalTitle').textContent = 'Create User';
-      ['editId', 'fName', 'fEmail'].forEach(id => document.getElementById(id).value = '');
-      document.getElementById('fRole').value = 'patient';
-      openModal('userModal');
-    });
-
-    document.getElementById('saveBtn').addEventListener('click', () => {
-      const id = document.getElementById('editId').value;
-      const name = document.getElementById('fName').value.trim();
-      const email = document.getElementById('fEmail').value.trim();
-      const role = document.getElementById('fRole').value;
-      if (!name) { toast('Name is required.', 'error'); return; }
-      if (!isValidEmail(email)) { toast('Enter a valid email.', 'error'); return; }
-
-      if (id) {
-        DB.update(DB_KEYS.users, id, { name, email, role });
-        addAuditLog(user.name, 'Updated user account', 'Users');
-        toast('User updated successfully!', 'success');
-      } else {
-        DB.insert(DB_KEYS.users, { id: 'u-' + Date.now(), name, email, password: 'Welcome123!', role, status: 'Active', registered: today(), lastActivity: today() });
-        addAuditLog(user.name, 'Created ' + role + ' account', 'Users');
-        toast('User created successfully!', 'success');
       }
-      closeModal('userModal');
-      render();
-    });
 
-    ['uSearch', 'uRole', 'uStatus'].forEach(id => {
-      document.getElementById(id).addEventListener('input', debounce(render, 150));
-      document.getElementById(id).addEventListener('change', render);
-    });
-    render();
+      function render() {
+        const term = val('uSearch').toLowerCase(), role = val('uRole'), st = val('uStatus');
+        const list = users
+          .filter(u => !role || u.rol === role)
+          .filter(u => st === '' || String(u.activo ? 1 : 0) === st)
+          .filter(u => !term || (fullName(u) + ' ' + u.correo + ' ' + u.documentoIdentidad).toLowerCase().includes(term));
+        if (list.length === 0) { body.innerHTML = ''; emptyState(empty, 'fa-users', 'No users found', 'Try a different search or filter.'); return; }
+        empty.innerHTML = '';
+        body.innerHTML = list.map(u => `
+          <tr>
+            <td><div class="flex items-center gap-12"><span class="avatar-sm">${initials(fullName(u))}</span><span>${esc(fullName(u))}</span></div></td>
+            <td>${esc(u.documentoIdentidad)}</td>
+            <td>${esc(u.correo)}</td>
+            <td>${rolBadge(u.rol)}</td>
+            <td>${esc(u.especialidad ? u.especialidad + ' · ' + (u.numeroColegiatura || '') : (u.cargo || '—'))}</td>
+            <td>${activoBadge(u.activo)}</td>
+            <td class="table-actions">
+              <button class="btn btn-outline btn-sm" data-act="edit" data-id="${u.idUsuario}" data-tooltip="Edit"><i class="fa-solid fa-pen"></i></button>
+              <button class="btn btn-outline btn-sm" data-act="toggle" data-id="${u.idUsuario}" data-tooltip="${u.activo ? 'Deactivate' : 'Activate'}"><i class="fa-solid ${u.activo ? 'fa-user-slash' : 'fa-user-check'}"></i></button>
+            </td>
+          </tr>`).join('');
+      }
+
+      function roleFields() {
+        const r = val('fRol');
+        qs('#rowMedico').style.display = r === 'MEDICO' ? '' : 'none';
+        qs('#rowCargo').style.display = r === 'MEDICO' || r === 'PACIENTE' ? 'none' : '';
+      }
+      qs('#fRol').addEventListener('change', roleFields);
+
+      qs('#newBtn').addEventListener('click', () => {
+        qs('#modalTitle').textContent = 'Add User';
+        ['editId', 'fNombres', 'fApellidos', 'fDoc', 'fCorreo', 'fPass', 'fCol', 'fCargo'].forEach(id => document.getElementById(id).value = '');
+        qs('#fRol').disabled = false; qs('#fRol').value = 'RECEPCIONISTA';
+        qs('#fDoc').disabled = false; qs('#gPass').style.display = '';
+        Array.from(qs('#fRol').options).forEach(o => o.hidden = false);
+        roleFields(); openModal('userModal');
+      });
+
+      body.addEventListener('click', async (e) => {
+        const b = e.target.closest('button[data-act]'); if (!b) return;
+        const u = users.find(x => String(x.idUsuario) === b.dataset.id); if (!u) return;
+        if (b.dataset.act === 'toggle') {
+          await safe(async () => {
+            await Api.usuarios.estado(u.idUsuario, !u.activo);
+            toast(`User ${u.activo ? 'deactivated' : 'activated'}.`, 'success');
+            await load();
+          });
+        } else {
+          qs('#modalTitle').textContent = 'Edit User';
+          qs('#editId').value = u.idUsuario;
+          qs('#fNombres').value = u.nombres; qs('#fApellidos').value = u.apellidos;
+          qs('#fDoc').value = u.documentoIdentidad; qs('#fDoc').disabled = true;
+          qs('#fCorreo').value = u.correo; qs('#gPass').style.display = 'none';
+          // el rol solo puede cambiar entre Receptionist y Administrator
+          const admin = u.rol === 'RECEPCIONISTA' || u.rol === 'ADMINISTRADOR';
+          Array.from(qs('#fRol').options).forEach(o => o.hidden = !(admin ? (o.value === 'RECEPCIONISTA' || o.value === 'ADMINISTRADOR') : o.value === u.rol));
+          if (!admin && ![...qs('#fRol').options].some(o => o.value === u.rol)) qs('#fRol').add(new Option(ROL_LABEL[u.rol], u.rol));
+          qs('#fRol').value = u.rol; qs('#fRol').disabled = !admin;
+          if (u.idEspecialidad) qs('#fEsp').value = u.idEspecialidad;
+          qs('#fCol').value = u.numeroColegiatura || ''; qs('#fCargo').value = u.cargo || '';
+          roleFields(); openModal('userModal');
+        }
+      });
+
+      qs('#saveBtn').addEventListener('click', async () => {
+        const id = val('editId'), rol = val('fRol');
+        if (!val('fNombres') || !val('fApellidos')) { toast('First and last names are required.', 'error'); return; }
+        if (!isValidEmail(val('fCorreo'))) { toast('Enter a valid email.', 'error'); return; }
+        if (!id) {
+          if (val('fDoc').length < 8 || val('fDoc').length > 15) { toast('Document ID must have 8 to 15 characters.', 'error'); return; }
+          if (qs('#fPass').value.length < 8) { toast('Password must have at least 8 characters.', 'error'); return; }
+        }
+        if (rol === 'MEDICO' && (!val('fEsp') || !val('fCol'))) { toast('Doctors need a specialty and a license number.', 'error'); return; }
+        const payload = {
+          nombres: val('fNombres'), apellidos: val('fApellidos'), correo: val('fCorreo'), rol,
+          idEspecialidad: rol === 'MEDICO' ? Number(val('fEsp')) : null,
+          numeroColegiatura: rol === 'MEDICO' ? val('fCol') : null,
+          cargo: rol === 'MEDICO' ? null : (val('fCargo') || null)
+        };
+        await safe(async () => {
+          if (id) { await Api.usuarios.update(id, payload); toast('User updated.', 'success'); }
+          else { await Api.usuarios.create({ ...payload, documentoIdentidad: val('fDoc'), password: qs('#fPass').value }); toast('User created and saved in the database.', 'success'); }
+          closeModal('userModal'); await load();
+        });
+      });
+
+      ['uSearch', 'uRole', 'uStatus'].forEach(id => {
+        document.getElementById(id).addEventListener('input', debounce(render, 150));
+        document.getElementById(id).addEventListener('change', render);
+      });
+      await load();
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

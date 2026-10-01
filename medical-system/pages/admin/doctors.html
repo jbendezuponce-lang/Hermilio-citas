@@ -19,19 +19,17 @@
     <div id="topbar-mount"></div>
     <div class="content-area">
       <div class="content-header">
-        <div><h1>Doctor Management</h1><p>Manage doctor profiles and specialties.</p></div>
+        <div><h1 id="pageTitle">Doctor Management</h1><p id="pageSub">Manage doctor profiles and specialties.</p></div>
         <button class="btn btn-primary" id="newBtn"><i class="fa-solid fa-user-doctor"></i> Add Doctor</button>
       </div>
-
       <div class="toolbar">
         <div class="search-input"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="dSearch" placeholder="Search doctors..."></div>
         <select class="filter-select" id="dSpec"><option value="">All Specialties</option></select>
-        <select class="filter-select" id="dStatus"><option value="">All Statuses</option><option>Active</option><option>Inactive</option></select>
+        <select class="filter-select" id="dStatus"><option value="">All Statuses</option><option value="1">Active</option><option value="0">Inactive</option></select>
       </div>
-
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>Doctor</th><th>Specialty</th><th>Experience</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Doctor</th><th>Specialty</th><th>License no.</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody id="dBody"></tbody>
         </table>
       </div>
@@ -39,25 +37,24 @@
     </div>
   </div>
 </div>
-
 <div class="modal-overlay" id="docModal">
   <div class="modal-box modal-lg">
     <div class="modal-header"><h3 id="modalTitle">Add Doctor</h3><button class="modal-close" onclick="closeModal('docModal')">&times;</button></div>
     <div class="modal-body">
       <input type="hidden" id="editId">
       <div class="form-row">
-        <div class="form-group"><label for="fName">Name</label><input type="text" id="fName"></div>
-        <div class="form-group"><label for="fSpec">Specialty</label><select id="fSpec"></select></div>
+        <div class="form-group"><label for="fNombres">First names <span class="req">*</span></label><input type="text" id="fNombres" maxlength="100"></div>
+        <div class="form-group"><label for="fApellidos">Last names <span class="req">*</span></label><input type="text" id="fApellidos" maxlength="100"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label for="fProfId">Professional ID</label><input type="text" id="fProfId"></div>
-        <div class="form-group"><label for="fExp">Experience (years)</label><input type="number" id="fExp" min="0"></div>
+        <div class="form-group"><label for="fDoc">Document ID (8-15 chars) <span class="req">*</span></label><input type="text" id="fDoc" maxlength="15"></div>
+        <div class="form-group"><label for="fCol">Professional license no. <span class="req">*</span></label><input type="text" id="fCol" maxlength="20" placeholder="CMP-12345"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label for="fEmail">Email</label><input type="email" id="fEmail"></div>
-        <div class="form-group"><label for="fPhone">Phone</label><input type="tel" id="fPhone"></div>
+        <div class="form-group"><label for="fCorreo">Email <span class="req">*</span></label><input type="email" id="fCorreo" maxlength="150"></div>
+        <div class="form-group"><label for="fEsp">Specialty <span class="req">*</span></label><select id="fEsp"></select></div>
       </div>
-      <div class="form-group"><label for="fLoc">Location</label><select id="fLoc"></select></div>
+      <div class="form-group" id="gPass"><label for="fPass">Initial password (min. 8) <span class="req">*</span></label><input type="password" id="fPass" maxlength="72" autocomplete="new-password"><div class="form-hint">The doctor can change it later with “Forgot password”.</div></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('docModal')">Cancel</button>
@@ -67,6 +64,7 @@
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -74,112 +72,97 @@
   const user = Auth.requireRole(['admin']);
   if (user) {
     renderPortalLayout('doctors.html');
-    const specialties = DB.get(DB_KEYS.specialties);
-    const locations = DB.get(DB_KEYS.locations);
-    const specMap = Object.fromEntries(specialties.map(s => [s.id, s.name]));
-    document.getElementById('dSpec').innerHTML += specialties.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-    document.getElementById('fSpec').innerHTML = specialties.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-    document.getElementById('fLoc').innerHTML = locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+    (async () => {
+      try {
 
-    function render() {
-      const term = document.getElementById('dSearch').value.toLowerCase().trim();
-      const spec = document.getElementById('dSpec').value;
-      const status = document.getElementById('dStatus').value;
-      const list = DB.get(DB_KEYS.doctors)
-        .filter(d => !spec || d.specialtyId === spec)
-        .filter(d => !status || d.status === status)
-        .filter(d => !term || d.name.toLowerCase().includes(term));
+      const body = qs('#dBody'), empty = qs('#dEmpty');
+      let doctors = [], specs = [];
+      const val = id => document.getElementById(id).value.trim();
 
-      const body = document.getElementById('dBody');
-      const empty = document.getElementById('dEmpty');
-      if (list.length === 0) { body.innerHTML = ''; emptyState(empty, 'fa-user-doctor', 'No doctors found', 'Try a different search or filter.'); return; }
-      empty.innerHTML = '';
-      body.innerHTML = list.map(d => `
-        <tr>
-          <td><div class="flex items-center gap-12"><img src="${d.photo}" class="avatar" style="width:34px;height:34px;" alt=""><span>${d.name}</span></div></td>
-          <td>${specMap[d.specialtyId]}</td>
-          <td>${d.experience} yrs</td>
-          <td>${d.email}</td>
-          <td>${statusBadge(d.status)}</td>
-          <td class="table-actions">
-            <button class="btn btn-outline btn-sm edit-btn" data-id="${d.id}" data-tooltip="Edit"><i class="fa-solid fa-pen"></i></button>
-            <button class="btn btn-outline btn-sm toggle-btn" data-id="${d.id}" data-tooltip="${d.status === 'Active' ? 'Deactivate' : 'Activate'}"><i class="fa-solid ${d.status === 'Active' ? 'fa-user-slash' : 'fa-user-check'}"></i></button>
-            <button class="btn btn-danger btn-sm del-btn" data-id="${d.id}" data-tooltip="Delete"><i class="fa-solid fa-trash"></i></button>
-          </td>
-        </tr>`).join('');
-
-      qsa('.edit-btn').forEach(b => b.addEventListener('click', () => {
-        const d = DB.find(DB_KEYS.doctors, b.dataset.id);
-        document.getElementById('modalTitle').textContent = 'Edit Doctor';
-        document.getElementById('editId').value = d.id;
-        document.getElementById('fName').value = d.name;
-        document.getElementById('fSpec').value = d.specialtyId;
-        document.getElementById('fProfId').value = d.professionalId;
-        document.getElementById('fExp').value = d.experience;
-        document.getElementById('fEmail').value = d.email;
-        document.getElementById('fPhone').value = d.phone;
-        document.getElementById('fLoc').value = d.locationId;
-        openModal('docModal');
-      }));
-      qsa('.toggle-btn').forEach(b => b.addEventListener('click', () => {
-        const d = DB.find(DB_KEYS.doctors, b.dataset.id);
-        const newStatus = d.status === 'Active' ? 'Inactive' : 'Active';
-        DB.update(DB_KEYS.doctors, d.id, { status: newStatus });
-        addAuditLog(user.name, (newStatus === 'Active' ? 'Activated' : 'Deactivated') + ' doctor', 'Doctors');
-        toast(`Doctor ${newStatus === 'Active' ? 'activated' : 'deactivated'}.`, 'success');
+      async function load() {
+        skeletonRows(body, 4, 6);
+        const [users, sp] = await Promise.all([Api.usuarios.list(), Api.especialidades.list()]);
+        specs = sp; doctors = users.filter(u => u.rol === 'MEDICO');
+        const opts = specs.map(s => `<option value="${s.idEspecialidad}">${esc(s.nombreEspecialidad)}</option>`).join('');
+        qs('#dSpec').innerHTML = '<option value="">All Specialties</option>' + opts;
+        qs('#fEsp').innerHTML = opts;
         render();
-      }));
-      qsa('.del-btn').forEach(b => b.addEventListener('click', () => {
-        confirmDialog('Delete this doctor profile? This cannot be undone.', () => {
-          DB.remove(DB_KEYS.doctors, b.dataset.id);
-          addAuditLog(user.name, 'Deleted doctor profile', 'Doctors');
-          toast('Doctor deleted.', 'success');
-          render();
-        }, { danger: true, confirmText: 'Delete' });
-      }));
-    }
-
-    document.getElementById('newBtn').addEventListener('click', () => {
-      document.getElementById('modalTitle').textContent = 'Add Doctor';
-      ['editId', 'fName', 'fProfId', 'fExp', 'fEmail', 'fPhone'].forEach(id => document.getElementById(id).value = '');
-      openModal('docModal');
-    });
-
-    document.getElementById('saveBtn').addEventListener('click', () => {
-      const id = document.getElementById('editId').value;
-      const name = document.getElementById('fName').value.trim();
-      const email = document.getElementById('fEmail').value.trim();
-      if (!name) { toast('Name is required.', 'error'); return; }
-      if (!isValidEmail(email)) { toast('Enter a valid email.', 'error'); return; }
-
-      const data = {
-        name, specialtyId: document.getElementById('fSpec').value, professionalId: document.getElementById('fProfId').value.trim(),
-        experience: parseInt(document.getElementById('fExp').value) || 0, email, phone: document.getElementById('fPhone').value.trim(),
-        locationId: document.getElementById('fLoc').value
-      };
-
-      if (id) {
-        DB.update(DB_KEYS.doctors, id, data);
-        addAuditLog(user.name, 'Updated doctor profile', 'Doctors');
-        toast('Doctor updated successfully!', 'success');
-      } else {
-        DB.insert(DB_KEYS.doctors, {
-          id: 'doc-' + Date.now(), userId: null, ...data, photo: `https://i.pravatar.cc/300?img=${Math.floor(Math.random()*60)+1}`,
-          rating: '4.5', education: 'MD, State University', certifications: ['Board Certified'], bio: 'Dedicated healthcare professional.',
-          consultationTypes: ['In person'], status: 'Active', schedule: [], blockedDates: []
-        });
-        addAuditLog(user.name, 'Created doctor account', 'Doctors');
-        toast('Doctor created successfully!', 'success');
       }
-      closeModal('docModal');
-      render();
-    });
 
-    ['dSearch', 'dSpec', 'dStatus'].forEach(id => {
-      document.getElementById(id).addEventListener('input', debounce(render, 150));
-      document.getElementById(id).addEventListener('change', render);
-    });
-    render();
+      function render() {
+        const term = val('dSearch').toLowerCase(), spec = val('dSpec'), st = val('dStatus');
+        const list = doctors
+          .filter(d => !spec || String(d.idEspecialidad) === spec)
+          .filter(d => st === '' || String(d.activo ? 1 : 0) === st)
+          .filter(d => !term || (fullName(d) + ' ' + d.correo).toLowerCase().includes(term));
+        if (list.length === 0) { body.innerHTML = ''; emptyState(empty, 'fa-user-doctor', 'No doctors found', 'Add a doctor or try a different filter.'); return; }
+        empty.innerHTML = '';
+        body.innerHTML = list.map(d => `
+          <tr>
+            <td><div class="flex items-center gap-12"><span class="avatar-sm">${initials(fullName(d))}</span><span>${esc(fullName(d))}</span></div></td>
+            <td>${esc(d.especialidad || '—')}</td>
+            <td>${esc(d.numeroColegiatura || '—')}</td>
+            <td>${esc(d.correo)}</td>
+            <td>${activoBadge(d.activo)}</td>
+            <td class="table-actions">
+              <button class="btn btn-outline btn-sm" data-act="edit" data-id="${d.idUsuario}" data-tooltip="Edit"><i class="fa-solid fa-pen"></i></button>
+              <button class="btn btn-outline btn-sm" data-act="toggle" data-id="${d.idUsuario}" data-tooltip="${d.activo ? 'Deactivate' : 'Activate'}"><i class="fa-solid ${d.activo ? 'fa-user-slash' : 'fa-user-check'}"></i></button>
+            </td>
+          </tr>`).join('');
+      }
+
+      qs('#newBtn').addEventListener('click', () => {
+        qs('#modalTitle').textContent = 'Add Doctor';
+        ['editId', 'fNombres', 'fApellidos', 'fDoc', 'fCol', 'fCorreo', 'fPass'].forEach(id => document.getElementById(id).value = '');
+        qs('#fDoc').disabled = false; qs('#gPass').style.display = '';
+        openModal('docModal');
+      });
+
+      body.addEventListener('click', async (e) => {
+        const b = e.target.closest('button[data-act]'); if (!b) return;
+        const d = doctors.find(x => String(x.idUsuario) === b.dataset.id); if (!d) return;
+        if (b.dataset.act === 'toggle') {
+          await safe(async () => {
+            await Api.usuarios.estado(d.idUsuario, !d.activo);
+            toast(`Doctor ${d.activo ? 'deactivated' : 'activated'}.`, 'success');
+            await load();
+          });
+        } else {
+          qs('#modalTitle').textContent = 'Edit Doctor';
+          qs('#editId').value = d.idUsuario;
+          qs('#fNombres').value = d.nombres; qs('#fApellidos').value = d.apellidos;
+          qs('#fDoc').value = d.documentoIdentidad; qs('#fDoc').disabled = true;
+          qs('#fCol').value = d.numeroColegiatura || ''; qs('#fCorreo').value = d.correo;
+          qs('#fEsp').value = d.idEspecialidad; qs('#gPass').style.display = 'none';
+          openModal('docModal');
+        }
+      });
+
+      qs('#saveBtn').addEventListener('click', async () => {
+        const id = val('editId');
+        if (!val('fNombres') || !val('fApellidos')) { toast('First and last names are required.', 'error'); return; }
+        if (!isValidEmail(val('fCorreo'))) { toast('Enter a valid email.', 'error'); return; }
+        if (!val('fCol')) { toast('The license number is required.', 'error'); return; }
+        if (!id) {
+          if (val('fDoc').length < 8 || val('fDoc').length > 15) { toast('Document ID must have 8 to 15 characters.', 'error'); return; }
+          if (qs('#fPass').value.length < 8) { toast('Password must have at least 8 characters.', 'error'); return; }
+        }
+        const base = { nombres: val('fNombres'), apellidos: val('fApellidos'), correo: val('fCorreo'), rol: 'MEDICO',
+                       idEspecialidad: Number(val('fEsp')), numeroColegiatura: val('fCol'), cargo: null };
+        await safe(async () => {
+          if (id) { await Api.usuarios.update(id, base); toast('Doctor updated.', 'success'); }
+          else { await Api.usuarios.create({ ...base, documentoIdentidad: val('fDoc'), password: qs('#fPass').value }); toast('Doctor created and saved in the database.', 'success'); }
+          closeModal('docModal'); await load();
+        });
+      });
+
+      ['dSearch', 'dSpec', 'dStatus'].forEach(id => {
+        document.getElementById(id).addEventListener('input', debounce(render, 150));
+        document.getElementById(id).addEventListener('change', render);
+      });
+      await load();
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

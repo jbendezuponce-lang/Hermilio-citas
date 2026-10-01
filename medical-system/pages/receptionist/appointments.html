@@ -19,53 +19,56 @@
     <div id="topbar-mount"></div>
     <div class="content-area">
       <div class="content-header">
-        <div><h1>Appointment Management</h1><p>Create, confirm, cancel and reschedule appointments.</p></div>
-        <button class="btn btn-primary" id="newApptBtn"><i class="fa-solid fa-plus"></i> Create Appointment</button>
+        <div><h1 id="pageTitle">Appointments</h1><p id="pageSub">Daily agenda, in-person bookings and waiting list.</p></div>
+        <button class="btn btn-primary" id="newBtn"><i class="fa-solid fa-calendar-plus"></i> New appointment</button>
       </div>
-
-      <div class="toolbar">
-        <div class="search-input"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="aSearch" placeholder="Search patient or doctor..."></div>
-        <select class="filter-select" id="aStatus"><option value="">All Statuses</option><option>Confirmed</option><option>Pending</option><option>Completed</option><option>Cancelled</option></select>
-        <input type="date" id="aDate" class="filter-select">
+      <div class="tabs" id="tabs"><button class="tab-btn active" data-tab="agenda">Daily Agenda</button><button class="tab-btn" data-tab="espera">Waiting List</button></div>
+      <div class="tab-panel active" id="tab-agenda">
+        <div class="toolbar">
+          <button class="btn btn-outline" id="prevDay" aria-label="Previous day"><i class="fa-solid fa-chevron-left"></i></button>
+          <div class="form-group" style="margin:0;"><input type="date" id="fDate" aria-label="Date"></div>
+          <button class="btn btn-outline" id="nextDay" aria-label="Next day"><i class="fa-solid fa-chevron-right"></i></button>
+          <button class="btn btn-outline" id="todayBtn">Today</button>
+          <select class="filter-select" id="fDoc"><option value="">All doctors</option></select>
+          <div class="search-input"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="fSearch" placeholder="Search patient..."></div>
+        </div>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>Time</th><th>Patient</th><th>Document</th><th>Doctor</th><th>Location</th><th>Source</th><th>Status</th><th>Actions</th></tr></thead><tbody id="aBody"></tbody></table></div>
+        <div id="aEmpty"></div>
       </div>
-
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr><th>Patient</th><th>Doctor</th><th>Date</th><th>Time</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody id="aBody"></tbody>
-        </table>
+      <div class="tab-panel" id="tab-espera">
+        <div class="toolbar"><select class="filter-select" id="wSpec"><option value="">All specialties</option></select><button class="btn btn-primary" id="wAdd"><i class="fa-solid fa-plus"></i> Add to waiting list</button></div>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>Patient</th><th>Document</th><th>Specialty</th><th>Registered</th><th>Status</th><th>Actions</th></tr></thead><tbody id="wBody"></tbody></table></div>
+        <div id="wEmpty"></div>
       </div>
-      <div id="aEmpty"></div>
     </div>
   </div>
 </div>
-
-<div class="modal-overlay" id="apptModal">
-  <div class="modal-box modal-lg">
-    <div class="modal-header"><h3>Create Appointment</h3><button class="modal-close" onclick="closeModal('apptModal')">&times;</button></div>
-    <div class="modal-body">
-      <div class="form-row">
-        <div class="form-group"><label for="mPatient">Patient</label><select id="mPatient"></select></div>
-        <div class="form-group"><label for="mDoctor">Doctor</label><select id="mDoctor"></select></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label for="mDate">Date</label><input type="date" id="mDate"></div>
-        <div class="form-group"><label for="mTime">Time</label><input type="time" id="mTime"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label for="mType">Consultation Type</label><select id="mType"><option>In person</option><option>Virtual</option></select></div>
-        <div class="form-group"><label for="mStatus">Status</label><select id="mStatus"><option>Pending</option><option>Confirmed</option></select></div>
-      </div>
-      <div class="form-group"><label for="mReason">Reason</label><textarea id="mReason" placeholder="Reason for visit"></textarea></div>
+<div class="modal-overlay" id="newModal"><div class="modal-box modal-lg">
+  <div class="modal-header"><h3 id="newTitle">New in-person appointment</h3><button class="modal-close" onclick="closeModal('newModal')">&times;</button></div>
+  <div class="modal-body">
+    <div class="form-group" id="gPat"><label for="nDoc">Patient document ID <span class="req">*</span></label>
+      <div class="flex gap-8"><input type="text" id="nDoc" maxlength="15" style="flex:1;"><button class="btn btn-outline" id="nFind" type="button"><i class="fa-solid fa-magnifying-glass"></i> Find</button></div>
+      <div id="nPatient" class="form-hint"></div></div>
+    <div class="form-row">
+      <div class="form-group"><label for="nSpec">Specialty <span class="req">*</span></label><select id="nSpec"></select></div>
+      <div class="form-group"><label for="nDate">Date <span class="req">*</span></label><select id="nDate"></select></div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('apptModal')">Cancel</button>
-      <button class="btn btn-primary" id="saveApptBtn">Create Appointment</button>
-    </div>
+    <div class="form-group"><label for="nSlot">Time slot <span class="req">*</span></label><select id="nSlot"></select></div>
   </div>
-</div>
+  <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('newModal')">Cancel</button><button class="btn btn-primary" id="nSave">Save appointment</button></div>
+</div></div>
+<div class="modal-overlay" id="wModal"><div class="modal-box">
+  <div class="modal-header"><h3>Add to waiting list</h3><button class="modal-close" onclick="closeModal('wModal')">&times;</button></div>
+  <div class="modal-body">
+    <div class="form-group"><label for="wDoc">Patient document ID <span class="req">*</span></label>
+      <div class="flex gap-8"><input type="text" id="wDoc" maxlength="15" style="flex:1;"><button class="btn btn-outline" id="wFind" type="button"><i class="fa-solid fa-magnifying-glass"></i> Find</button></div><div id="wPatient" class="form-hint"></div></div>
+    <div class="form-group"><label for="wEsp">Specialty <span class="req">*</span></label><select id="wEsp"></select></div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('wModal')">Cancel</button><button class="btn btn-primary" id="wSave">Add</button></div>
+</div></div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -73,90 +76,123 @@
   const user = Auth.requireRole(['receptionist']);
   if (user) {
     renderPortalLayout('appointments.html');
-    const patients = DB.get(DB_KEYS.patients);
-    const doctors = DB.get(DB_KEYS.doctors);
-    const patientMap = Object.fromEntries(patients.map(p => [p.id, p]));
-    const doctorMap = Object.fromEntries(doctors.map(d => [d.id, d]));
+    (async () => {
+      try {
 
-    document.getElementById('mPatient').innerHTML = patients.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-    document.getElementById('mDoctor').innerHTML = doctors.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-    document.getElementById('mDate').min = today();
+      const sortCitas = (a, b) => (a.fecha + a.horaInicio).localeCompare(b.fecha + b.horaInicio);
+      const ACTIVAS = ['CONFIRMADA', 'REPROGRAMADA', 'CHECK_IN'];
 
-    function render() {
-      const term = document.getElementById('aSearch').value.toLowerCase().trim();
-      const status = document.getElementById('aStatus').value;
-      const date = document.getElementById('aDate').value;
-      const list = DB.get(DB_KEYS.appointments)
-        .filter(a => !status || a.status === status)
-        .filter(a => !date || a.date === date)
-        .filter(a => !term || patientMap[a.patientId]?.name.toLowerCase().includes(term) || doctorMap[a.doctorId]?.name.toLowerCase().includes(term))
-        .sort((a, b) => b.date.localeCompare(a.date));
+      const body = qs('#aBody'), empty = qs('#aEmpty');
+      let citas = [], medicos = [], specs = [], pacienteSel = null, slots = [], editCita = null;
+      [medicos, specs] = await Promise.all([Api.medicos.list(), Api.especialidades.list()]);
+      qs('#fDoc').innerHTML = '<option value="">All doctors</option>' + medicos.map(m => `<option value="${m.idMedico}">${esc(fullName(m))}</option>`).join('');
+      const specOpts = specs.map(s => `<option value="${s.idEspecialidad}">${esc(s.nombreEspecialidad)}</option>`).join('');
+      qs('#nSpec').innerHTML = specOpts; qs('#wEsp').innerHTML = specOpts; qs('#wSpec').innerHTML = '<option value="">All specialties</option>' + specOpts;
+      qs('#fDate').value = today();
 
-      const body = document.getElementById('aBody');
-      const empty = document.getElementById('aEmpty');
-      if (list.length === 0) { body.innerHTML = ''; emptyState(empty, 'fa-calendar-xmark', 'No appointments found', 'Try adjusting your filters.'); return; }
-      empty.innerHTML = '';
-      body.innerHTML = list.map(a => `
-        <tr>
-          <td>${patientMap[a.patientId]?.name || '—'}</td>
-          <td>${doctorMap[a.doctorId]?.name || '—'}</td>
-          <td>${formatDate(a.date)}</td>
-          <td>${a.time}</td>
-          <td>${a.type}</td>
-          <td>${statusBadge(a.status)}</td>
-          <td class="table-actions">
-            ${a.status === 'Pending' ? `<button class="btn btn-outline btn-sm confirm-btn" data-id="${a.id}" data-tooltip="Confirm"><i class="fa-solid fa-check"></i></button>` : ''}
-            ${(a.status === 'Confirmed' || a.status === 'Pending') ? `<button class="btn btn-danger btn-sm cancel-btn" data-id="${a.id}" data-tooltip="Cancel"><i class="fa-solid fa-xmark"></i></button>` : ''}
-          </td>
-        </tr>`).join('');
-
-      qsa('.confirm-btn').forEach(b => b.addEventListener('click', () => {
-        DB.update(DB_KEYS.appointments, b.dataset.id, { status: 'Confirmed' });
-        addAuditLog(user.name, 'Confirmed appointment', 'Appointments');
-        toast('Appointment confirmed.', 'success');
-        render();
+      // ---- pestañas
+      qsa('#tabs .tab-btn').forEach(b => b.addEventListener('click', () => {
+        qsa('#tabs .tab-btn').forEach(x => x.classList.toggle('active', x === b));
+        qsa('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + b.dataset.tab));
+        if (b.dataset.tab === 'espera') safe(loadWait);
       }));
-      qsa('.cancel-btn').forEach(b => b.addEventListener('click', () => {
-        confirmDialog('Cancel this appointment?', () => {
-          DB.update(DB_KEYS.appointments, b.dataset.id, { status: 'Cancelled' });
-          addAuditLog(user.name, 'Cancelled appointment', 'Appointments');
-          toast('Appointment cancelled.', 'success');
-          render();
-        }, { danger: true, confirmText: 'Cancel Appointment' });
-      }));
-    }
 
-    ['aSearch', 'aStatus', 'aDate'].forEach(id => {
-      document.getElementById(id).addEventListener('input', debounce(render, 150));
-      document.getElementById(id).addEventListener('change', render);
-    });
-
-    document.getElementById('newApptBtn').addEventListener('click', () => openModal('apptModal'));
-    document.getElementById('saveApptBtn').addEventListener('click', () => {
-      const patientId = document.getElementById('mPatient').value;
-      const doctorId = document.getElementById('mDoctor').value;
-      const date = document.getElementById('mDate').value;
-      const time = document.getElementById('mTime').value;
-      const type = document.getElementById('mType').value;
-      const status = document.getElementById('mStatus').value;
-      const reason = document.getElementById('mReason').value.trim();
-
-      if (!date || !time) { toast('Please select a date and time.', 'error'); return; }
-      if (!reason) { toast('Please enter a reason.', 'error'); return; }
-
-      const doc = doctorMap[doctorId];
-      DB.insert(DB_KEYS.appointments, {
-        id: 'APT-' + Math.floor(4000 + Math.random() * 6000), patientId, doctorId,
-        specialtyId: doc.specialtyId, date, time, type, locationId: doc.locationId,
-        reason, status, createdAt: today()
+      // ---- agenda
+      async function load() {
+        skeletonRows(body, 4, 8);
+        citas = (await Api.citas.agenda(qs('#fDate').value, qs('#fDoc').value)).sort(sortCitas); render();
+      }
+      function render() {
+        const term = qs('#fSearch').value.toLowerCase().trim();
+        const list = citas.filter(c => !term || (c.paciente + ' ' + c.documentoPaciente).toLowerCase().includes(term));
+        if (!list.length) { body.innerHTML = ''; emptyState(empty, 'fa-calendar', 'No appointments', 'Nothing is scheduled for this date.'); return; }
+        empty.innerHTML = '';
+        body.innerHTML = list.map(c => {
+          const act = ['CONFIRMADA', 'REPROGRAMADA'].includes(c.estado), pres = c.origen === 'PRESENCIAL';
+          return `<tr><td>${fmtTime(c.horaInicio)}</td><td>${esc(c.paciente)}</td><td>${esc(c.documentoPaciente)}</td><td>${esc(c.medico)}</td><td>${esc(c.numeroPabellon)} · ${esc(c.codigoRoom)}</td>
+            <td><span class="badge ${pres ? 'badge-amber' : 'badge-blue'}">${pres ? 'Front desk' : 'App'}</span></td><td>${estadoBadge(c.estado)}</td>
+            <td class="table-actions">
+              ${act && c.fecha === today() ? `<button class="btn btn-success btn-sm" data-act="in" data-id="${c.idCita}" data-tooltip="Check-in"><i class="fa-solid fa-clipboard-check"></i></button>` : ''}
+              ${act && c.fecha <= today() ? `<button class="btn btn-outline btn-sm" data-act="noshow" data-id="${c.idCita}" data-tooltip="No-show"><i class="fa-solid fa-user-slash"></i></button>` : ''}
+              ${act && pres ? `<button class="btn btn-outline btn-sm" data-act="resch" data-id="${c.idCita}" data-tooltip="Reschedule"><i class="fa-solid fa-calendar-days"></i></button>
+              <button class="btn btn-danger btn-sm" data-act="cancel" data-id="${c.idCita}" data-tooltip="Cancel"><i class="fa-solid fa-xmark"></i></button>` : ''}</td></tr>`; }).join('');
+      }
+      body.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-act]'); if (!b) return;
+        const c = citas.find(x => String(x.idCita) === b.dataset.id); if (!c) return;
+        if (b.dataset.act === 'in') safe(async () => { await Api.citas.checkIn(c.idCita); toast('Check-in registered.', 'success'); await load(); });
+        if (b.dataset.act === 'noshow') confirmDialog('Mark this patient as a no-show?', () => safe(async () => { await Api.citas.noAsistio(c.idCita); toast('Marked as no-show.', 'success'); await load(); }), { danger: true, confirmText: 'Mark no-show' });
+        if (b.dataset.act === 'cancel') confirmDialog('Cancel this in-person appointment?', () => safe(async () => { await Api.citas.cancelar(c.idCita); toast('Appointment cancelled.', 'success'); await load(); }), { danger: true, confirmText: 'Cancel appointment' });
+        if (b.dataset.act === 'resch') openForm(c);
       });
-      addAuditLog(user.name, 'Created appointment', 'Appointments');
-      closeModal('apptModal');
-      toast('Appointment created successfully!', 'success');
-      render();
-    });
+      qs('#fDate').addEventListener('change', () => safe(load)); qs('#fDoc').addEventListener('change', () => safe(load));
+      qs('#fSearch').addEventListener('input', debounce(render, 150));
+      qs('#prevDay').addEventListener('click', () => { qs('#fDate').value = addDays(-1, qs('#fDate').value); safe(load); });
+      qs('#nextDay').addEventListener('click', () => { qs('#fDate').value = addDays(1, qs('#fDate').value); safe(load); });
+      qs('#todayBtn').addEventListener('click', () => { qs('#fDate').value = today(); safe(load); });
 
-    render();
+      // ---- alta / reprogramación presencial
+      async function loadSlotsForForm() {
+        slots = await Api.horarios.disponibles(qs('#nSpec').value);
+        if (editCita) slots = slots.filter(h => h.idHorario !== editCita.idHorario);
+        const dates = [...new Set(slots.map(h => h.fecha))].sort();
+        qs('#nDate').innerHTML = dates.length ? dates.map(d => `<option value="${d}">${formatDateLong(d)}</option>`).join('') : '<option value="">No free dates</option>';
+        fillTimes();
+      }
+      function fillTimes() {
+        const d = qs('#nDate').value, list = slots.filter(h => h.fecha === d);
+        qs('#nSlot').innerHTML = list.length ? list.map(h => `<option value="${h.idHorario}">${fmtTime(h.horaInicio)} – ${esc(h.medico)} · ${esc(h.numeroPabellon)} ${esc(h.codigoRoom)}</option>`).join('') : '<option value="">No free slots</option>';
+      }
+      function openForm(cita) {
+        editCita = cita || null; pacienteSel = null; qs('#nPatient').textContent = ''; qs('#nDoc').value = '';
+        qs('#newTitle').textContent = cita ? 'Reschedule in-person appointment' : 'New in-person appointment';
+        qs('#gPat').style.display = cita ? 'none' : '';
+        if (cita) qs('#nSpec').value = cita.idEspecialidad;
+        openModal('newModal'); safe(loadSlotsForForm);
+      }
+      qs('#newBtn').addEventListener('click', () => openForm(null));
+      qs('#nSpec').addEventListener('change', () => safe(loadSlotsForForm)); qs('#nDate').addEventListener('change', fillTimes);
+      qs('#nFind').addEventListener('click', () => safe(async () => {
+        const d = qs('#nDoc').value.trim(); if (!d) { toast('Enter a document ID.', 'error'); return; }
+        try { pacienteSel = await Api.pacientes.buscar(d); qs('#nPatient').innerHTML = `<i class="fa-solid fa-circle-check" style="color:var(--color-success)"></i> ${esc(fullName(pacienteSel))} · ${esc(pacienteSel.correo)}`; }
+        catch (e) { pacienteSel = null; qs('#nPatient').innerHTML = `<span style="color:var(--color-danger)">${esc(e.message)}</span> — register the patient first in “Patients”.`; }
+      }));
+      qs('#nSave').addEventListener('click', () => safe(async () => {
+        if (!qs('#nSlot').value) { toast('Select a time slot.', 'error'); return; }
+        if (editCita) { await Api.citas.reprogramar(editCita.idCita, Number(qs('#nSlot').value)); toast('Appointment rescheduled.', 'success'); }
+        else { if (!pacienteSel) { toast('Find the patient first.', 'error'); return; } await Api.citas.presencial(pacienteSel.idPaciente, Number(qs('#nSlot').value)); toast('Appointment saved.', 'success'); }
+        closeModal('newModal'); await load();
+      }));
+
+      // ---- lista de espera
+      async function loadWait() {
+        const list = await Api.listaEspera.list(qs('#wSpec').value), b = qs('#wBody');
+        if (!list.length) { b.innerHTML = ''; emptyState(qs('#wEmpty'), 'fa-hourglass-half', 'The waiting list is empty', 'Add patients when there are no free slots.'); return; }
+        qs('#wEmpty').innerHTML = '';
+        b.innerHTML = list.map(w => `<tr><td>${esc(w.paciente)}</td><td>${esc(w.documentoPaciente)}</td><td>${esc(w.especialidad)}</td><td>${formatDateTime(w.fechaRegistro)}</td>
+          <td><span class="badge ${w.estado === 'EN_ESPERA' ? 'badge-amber' : 'badge-green'}">${w.estado === 'EN_ESPERA' ? 'Waiting' : 'Attended'}</span></td>
+          <td class="table-actions">${w.estado === 'EN_ESPERA' ? `<button class="btn btn-success btn-sm" data-w="att" data-id="${w.idListaEspera}" data-tooltip="Mark attended"><i class="fa-solid fa-check"></i></button>` : ''}
+            <button class="btn btn-danger btn-sm" data-w="del" data-id="${w.idListaEspera}" data-tooltip="Remove"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
+      }
+      qs('#wBody').addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-w]'); if (!b) return;
+        if (b.dataset.w === 'att') safe(async () => { await Api.listaEspera.atender(b.dataset.id); toast('Marked as attended.', 'success'); await loadWait(); });
+        else confirmDialog('Remove this patient from the waiting list?', () => safe(async () => { await Api.listaEspera.remove(b.dataset.id); toast('Removed.', 'success'); await loadWait(); }), { danger: true, confirmText: 'Remove' });
+      });
+      qs('#wSpec').addEventListener('change', () => safe(loadWait));
+      let wPac = null;
+      qs('#wAdd').addEventListener('click', () => { wPac = null; qs('#wPatient').textContent = ''; qs('#wDoc').value = ''; openModal('wModal'); });
+      qs('#wFind').addEventListener('click', () => safe(async () => {
+        try { wPac = await Api.pacientes.buscar(qs('#wDoc').value.trim()); qs('#wPatient').innerHTML = `<i class="fa-solid fa-circle-check" style="color:var(--color-success)"></i> ${esc(fullName(wPac))}`; }
+        catch (e) { wPac = null; qs('#wPatient').innerHTML = `<span style="color:var(--color-danger)">${esc(e.message)}</span>`; }
+      }));
+      qs('#wSave').addEventListener('click', () => safe(async () => {
+        if (!wPac) { toast('Find the patient first.', 'error'); return; }
+        await Api.listaEspera.agregar(wPac.idPaciente, Number(qs('#wEsp').value)); toast('Added to the waiting list.', 'success'); closeModal('wModal'); await loadWait();
+      }));
+      await load();
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

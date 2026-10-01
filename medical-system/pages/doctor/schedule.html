@@ -19,52 +19,16 @@
     <div id="topbar-mount"></div>
     <div class="content-area">
       <div class="content-header">
-        <div><h1>My Schedule</h1><p>Configure your weekly working hours and blocked dates.</p></div>
-        <button class="btn btn-primary" id="addScheduleBtn"><i class="fa-solid fa-plus"></i> Add Schedule</button>
+        <div><h1 id="pageTitle">My Schedule</h1><p id="pageSub">Your appointments for the next 7 days. Time slots are managed by the administrator.</p></div>
+        
       </div>
-
-      <div class="card" style="margin-bottom:22px;">
-        <h4>Weekly Hours</h4>
-        <div class="table-wrap" style="border:none;">
-          <table class="data-table"><thead><tr><th>Day</th><th>From</th><th>To</th><th>Actions</th></tr></thead><tbody id="schedBody"></tbody></table>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="flex justify-between items-center">
-          <h4 style="margin:0;">Vacation Mode / Absences</h4>
-          <div class="checkbox-row"><input type="checkbox" id="vacationToggle"><label for="vacationToggle">Enable Vacation Mode</label></div>
-        </div>
-        <div class="flex gap-12" style="margin-top:16px;">
-          <input type="date" id="absenceDate" style="max-width:220px;">
-          <button class="btn btn-outline" id="addAbsenceBtn">Block This Date</button>
-        </div>
-        <div id="absenceList" style="margin-top:16px;"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="schedModal">
-  <div class="modal-box modal-sm">
-    <div class="modal-header"><h3>Add Schedule Block</h3><button class="modal-close" onclick="closeModal('schedModal')">&times;</button></div>
-    <div class="modal-body">
-      <div class="form-group"><label for="schedDay">Day</label>
-        <select id="schedDay"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option></select>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label for="schedFrom">From</label><input type="time" id="schedFrom" value="09:00"></div>
-        <div class="form-group"><label for="schedTo">To</label><input type="time" id="schedTo" value="13:00"></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('schedModal')">Cancel</button>
-      <button class="btn btn-primary" id="saveSchedBtn">Save</button>
+<div id="schBox"></div>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -72,62 +36,19 @@
   const user = Auth.requireRole(['doctor']);
   if (user) {
     renderPortalLayout('schedule.html');
-    const doctor = DB.find(DB_KEYS.doctors, user.doctorId);
+    (async () => {
+      try {
 
-    function renderSchedule() {
-      const body = document.getElementById('schedBody');
-      if (doctor.schedule.length === 0) { body.innerHTML = '<tr><td colspan="4" class="text-muted">No schedule configured yet.</td></tr>'; return; }
-      body.innerHTML = doctor.schedule.map((s, i) => `
-        <tr><td>${s.day}</td><td>${s.from}</td><td>${s.to}</td>
-        <td class="table-actions"><button class="btn btn-outline btn-sm del-sched" data-i="${i}"><i class="fa-solid fa-trash"></i></button></td></tr>`).join('');
-      qsa('.del-sched').forEach(btn => btn.addEventListener('click', () => {
-        doctor.schedule.splice(parseInt(btn.dataset.i), 1);
-        DB.update(DB_KEYS.doctors, doctor.id, { schedule: doctor.schedule });
-        toast('Schedule block removed.', 'success');
-        renderSchedule();
-      }));
-    }
+      const sortCitas = (a, b) => (a.fecha + a.horaInicio).localeCompare(b.fecha + b.horaInicio);
 
-    function renderAbsences() {
-      const list = document.getElementById('absenceList');
-      if (doctor.blockedDates.length === 0) { list.innerHTML = '<p class="text-muted">No blocked dates.</p>'; return; }
-      list.innerHTML = doctor.blockedDates.map((d, i) => `
-        <span class="badge badge-red" style="margin:4px 6px 4px 0;">${formatDate(d)} <i class="fa-solid fa-xmark del-absence" data-i="${i}" style="cursor:pointer;margin-left:6px;"></i></span>`).join('');
-      qsa('.del-absence').forEach(el => el.addEventListener('click', () => {
-        doctor.blockedDates.splice(parseInt(el.dataset.i), 1);
-        DB.update(DB_KEYS.doctors, doctor.id, { blockedDates: doctor.blockedDates });
-        renderAbsences();
-      }));
-    }
-
-    document.getElementById('addScheduleBtn').addEventListener('click', () => openModal('schedModal'));
-    document.getElementById('saveSchedBtn').addEventListener('click', () => {
-      const day = document.getElementById('schedDay').value;
-      const from = document.getElementById('schedFrom').value;
-      const to = document.getElementById('schedTo').value;
-      if (from >= to) { toast('End time must be after start time.', 'error'); return; }
-      doctor.schedule.push({ day, from, to });
-      DB.update(DB_KEYS.doctors, doctor.id, { schedule: doctor.schedule });
-      closeModal('schedModal');
-      toast('Schedule block added.', 'success');
-      renderSchedule();
-    });
-
-    document.getElementById('addAbsenceBtn').addEventListener('click', () => {
-      const date = document.getElementById('absenceDate').value;
-      if (!date) { toast('Please select a date.', 'error'); return; }
-      doctor.blockedDates.push(date);
-      DB.update(DB_KEYS.doctors, doctor.id, { blockedDates: doctor.blockedDates });
-      toast('Date blocked successfully.', 'success');
-      renderAbsences();
-    });
-
-    document.getElementById('vacationToggle').addEventListener('change', (e) => {
-      toast(e.target.checked ? 'Vacation mode enabled — you will not receive new bookings.' : 'Vacation mode disabled.', 'info');
-    });
-
-    renderSchedule();
-    renderAbsences();
+      const days = Array.from({ length: 7 }, (_, i) => addDays(i));
+      const data = await Promise.all(days.map(d => Api.citas.miAgenda(d)));
+      qs('#schBox').innerHTML = days.map((d, i) => { const list = data[i].filter(c => c.estado !== 'CANCELADA').sort(sortCitas); return `
+        <div class="card" style="margin-bottom:16px;"><div class="flex justify-between items-center"><h4 style="margin:0;">${formatDateLong(d)}${d === today() ? ' <span class="badge badge-blue">Today</span>' : ''}</h4>
+          <a href="agenda.html?date=${d}" class="btn btn-outline btn-sm">Open</a></div>
+          ${list.length ? `<div style="margin-top:12px;">${list.map(c => `<div class="flex items-center justify-between" style="padding:8px 0;border-top:1px solid var(--color-border);"><span><strong>${fmtTime(c.horaInicio)}</strong> · ${esc(c.paciente)}</span>${estadoBadge(c.estado)}</div>`).join('')}</div>` : '<p class="text-muted" style="margin:8px 0 0;">No appointments.</p>'}</div>`; }).join('');
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

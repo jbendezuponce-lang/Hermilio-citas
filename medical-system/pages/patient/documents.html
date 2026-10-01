@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Medical Documents | MediCare+</title>
+<title>Prescriptions | MediCare+</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../../css/style.css">
@@ -18,33 +18,17 @@
   <div class="main-content">
     <div id="topbar-mount"></div>
     <div class="content-area">
-      <div class="content-header"><div><h1>Medical Documents</h1><p>View and download your lab results, prescriptions and reports.</p></div></div>
-
-      <div class="toolbar">
-        <div class="search-input"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="docSearch" placeholder="Search documents..."></div>
-        <select class="filter-select" id="docType">
-          <option value="">All Categories</option>
-          <option>Laboratory results</option>
-          <option>Prescriptions</option>
-          <option>Medical reports</option>
-          <option>Imaging</option>
-          <option>Certificates</option>
-          <option>Other</option>
-        </select>
+      <div class="content-header">
+        <div><h1 id="pageTitle">My Prescriptions</h1><p id="pageSub">Medication prescribed by your doctors.</p></div>
+        
       </div>
-
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr><th>Document</th><th>Type</th><th>Date</th><th>Doctor</th><th>Size</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody id="docTableBody"></tbody>
-        </table>
-      </div>
-      <div id="docEmpty"></div>
+<div id="docBox"></div>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -52,46 +36,19 @@
   const user = Auth.requireRole(['patient']);
   if (user) {
     renderPortalLayout('documents.html');
-    const doctors = Object.fromEntries(DB.get(DB_KEYS.doctors).map(d => [d.id, d]));
+    (async () => {
+      try {
 
-    function render() {
-      const term = document.getElementById('docSearch').value.toLowerCase().trim();
-      const type = document.getElementById('docType').value;
-      const docs = DB.get(DB_KEYS.documents)
-        .filter(d => d.patientId === user.patientId)
-        .filter(d => !term || d.name.toLowerCase().includes(term))
-        .filter(d => !type || d.type === type)
-        .sort((a, b) => b.date.localeCompare(a.date));
-
-      const body = document.getElementById('docTableBody');
-      const empty = document.getElementById('docEmpty');
-      if (docs.length === 0) {
-        body.innerHTML = '';
-        emptyState(empty, 'fa-folder-open', 'No documents found', 'Documents shared by your doctor will appear here.');
-        return;
-      }
-      empty.innerHTML = '';
-      body.innerHTML = docs.map(d => `
-        <tr>
-          <td><i class="fa-solid fa-file-pdf" style="color:var(--color-danger);margin-right:8px;"></i>${d.name}</td>
-          <td>${d.type}</td>
-          <td>${formatDate(d.date)}</td>
-          <td>${doctors[d.doctorId]?.name || '—'}</td>
-          <td>${d.size}</td>
-          <td>${statusBadge(d.status)}</td>
-          <td class="table-actions">
-            <button class="btn btn-outline btn-sm view-doc" data-name="${d.name}" data-tooltip="View"><i class="fa-solid fa-eye"></i></button>
-            <button class="btn btn-outline btn-sm download-doc" data-name="${d.name}" data-tooltip="Download"><i class="fa-solid fa-download"></i></button>
-          </td>
-        </tr>`).join('');
-
-      qsa('.view-doc').forEach(b => b.addEventListener('click', () => toast(`Previewing "${b.dataset.name}" (simulated).`, 'info')));
-      qsa('.download-doc').forEach(b => b.addEventListener('click', () => toast(`Downloading "${b.dataset.name}" (simulated).`, 'success')));
-    }
-
-    document.getElementById('docSearch').addEventListener('input', debounce(render, 150));
-    document.getElementById('docType').addEventListener('change', render);
-    render();
+      const box = qs('#docBox');
+      const hist = await Api.historiales.mios();
+      const rows = hist.flatMap(h => (h.recetas || []).map(r => ({ ...r, fecha: h.fechaCita, medico: h.medico, idHistorial: h.idHistorial })));
+      if (!rows.length) { emptyState(box, 'fa-prescription-bottle-medical', 'No prescriptions yet', 'Prescriptions issued by your doctors will appear here.'); return; }
+      box.innerHTML = `<div class="table-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Medication</th><th>Dose</th><th>Instructions</th><th>Doctor</th><th></th></tr></thead><tbody>
+        ${rows.map(r => `<tr><td>${formatDate(r.fecha)}</td><td><strong>${esc(r.medicamento)}</strong></td><td>${esc(r.dosis)}</td><td>${esc(r.indicaciones || '—')}</td><td>${esc(r.medico)}</td>
+          <td><a class="btn btn-outline btn-sm" href="consultation-details.html?id=${r.idHistorial}">Consultation</a></td></tr>`).join('')}</tbody></table></div>
+        <button class="btn btn-outline" style="margin-top:16px;" onclick="window.print()"><i class="fa-solid fa-print"></i> Print</button>`;
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

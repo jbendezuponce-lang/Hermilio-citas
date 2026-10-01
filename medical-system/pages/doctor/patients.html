@@ -18,24 +18,20 @@
   <div class="main-content">
     <div id="topbar-mount"></div>
     <div class="content-area">
-      <div class="content-header"><div><h1>My Patients</h1><p>Everyone you've treated or have upcoming visits with.</p></div></div>
-
-      <div class="toolbar">
-        <div class="search-input"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="pSearch" placeholder="Search by name, National ID or Patient ID..."></div>
+      <div class="content-header">
+        <div><h1 id="pageTitle">My Patients</h1><p id="pageSub">Look up a patient by document ID and open their clinical record.</p></div>
+        
       </div>
-
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr><th>Patient</th><th>Age</th><th>Last Consultation</th><th>Next Appointment</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody id="pBody"></tbody>
-        </table>
-      </div>
-      <div id="pEmpty"></div>
+      <div class="card" style="max-width:760px;margin-bottom:22px;"><h4>Find a patient</h4>
+        <div class="flex gap-8"><input type="text" id="sDoc" maxlength="15" placeholder="Document ID" style="flex:1;"><button class="btn btn-primary" id="sGo"><i class="fa-solid fa-magnifying-glass"></i> Search</button></div></div>
+      <div id="result" style="margin-bottom:22px;"></div>
+      <div class="card"><h4>Today's patients</h4><div id="todayBox"></div></div>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -43,42 +39,26 @@
   const user = Auth.requireRole(['doctor']);
   if (user) {
     renderPortalLayout('patients.html');
-    const appts = DB.get(DB_KEYS.appointments).filter(a => a.doctorId === user.doctorId);
-    const consultations = DB.get(DB_KEYS.consultations).filter(c => c.doctorId === user.doctorId);
-    const patientIds = [...new Set(appts.map(a => a.patientId))];
-    const allPatients = DB.get(DB_KEYS.patients).filter(p => patientIds.includes(p.id));
+    (async () => {
+      try {
 
-    function age(dob) {
-      const diff = Date.now() - new Date(dob).getTime();
-      return Math.floor(diff / (365.25 * 24 * 3600 * 1000));
-    }
+      const sortCitas = (a, b) => (a.fecha + a.horaInicio).localeCompare(b.fecha + b.horaInicio);
 
-    function render() {
-      const term = document.getElementById('pSearch').value.toLowerCase().trim();
-      const filtered = allPatients.filter(p => !term || p.name.toLowerCase().includes(term) || p.nationalId.includes(term) || p.id.includes(term));
-      const body = document.getElementById('pBody');
-      const empty = document.getElementById('pEmpty');
-      if (filtered.length === 0) { body.innerHTML = ''; emptyState(empty, 'fa-users', 'No patients found', 'Try a different search term.'); return; }
-      empty.innerHTML = '';
-      body.innerHTML = filtered.map(p => {
-        const patientAppts = appts.filter(a => a.patientId === p.id);
-        const last = consultations.filter(c => c.patientId === p.id).sort((a, b) => b.date.localeCompare(a.date))[0];
-        const next = patientAppts.filter(a => a.date >= today() && a.status !== 'Cancelled').sort((a, b) => a.date.localeCompare(b.date))[0];
-        return `<tr>
-          <td><div class="flex items-center gap-12"><img src="${p.photo}" class="avatar" style="width:34px;height:34px;" alt=""><span>${p.name}</span></div></td>
-          <td>${age(p.dob)}</td>
-          <td>${last ? formatDate(last.date) : '—'}</td>
-          <td>${next ? formatDate(next.date) + ' · ' + next.time : '—'}</td>
-          <td>${statusBadge(p.status)}</td>
-          <td class="table-actions">
-            <a href="patient-profile.html?id=${p.id}" class="btn btn-outline btn-sm" data-tooltip="View patient"><i class="fa-solid fa-eye"></i></a>
-            <a href="consultation.html?patient=${p.id}" class="btn btn-outline btn-sm" data-tooltip="Start consultation"><i class="fa-solid fa-notes-medical"></i></a>
-          </td>
-        </tr>`;
-      }).join('');
-    }
-    document.getElementById('pSearch').addEventListener('input', debounce(render, 150));
-    render();
+      qs('#sGo').addEventListener('click', () => safe(async () => {
+        const d = qs('#sDoc').value.trim(); if (!d) { toast('Enter a document ID.', 'error'); return; }
+        try {
+          const p = await Api.pacientes.buscar(d);
+          qs('#result').innerHTML = `<div class="card" style="max-width:760px;"><div class="flex items-center gap-16"><span class="avatar-lg">${initials(fullName(p))}</span><div style="flex:1;"><h3 style="margin:0;">${esc(fullName(p))}</h3><div class="text-muted">Document ${esc(p.documentoIdentidad)} · ${esc(p.correo)}</div></div>
+            <a class="btn btn-primary" href="patient-profile.html?doc=${encodeURIComponent(p.documentoIdentidad)}">Open record</a></div></div>`;
+        } catch (e) { if (e.status === 404) emptyState(qs('#result'), 'fa-user-slash', 'Patient not found', 'No patient is registered with that document ID.'); else throw e; }
+      }));
+      qs('#sDoc').addEventListener('keydown', (e) => { if (e.key === 'Enter') qs('#sGo').click(); });
+      const citas = (await Api.citas.miAgenda(today())).sort(sortCitas);
+      if (!citas.length) emptyState(qs('#todayBox'), 'fa-users', 'No patients today', 'Your patients for today will appear here.');
+      else qs('#todayBox').innerHTML = citas.map(c => `<div class="flex items-center justify-between" style="padding:10px 0;border-bottom:1px solid var(--color-border);"><div class="flex items-center gap-12"><span class="avatar-sm">${initials(c.paciente)}</span><div><div style="font-weight:600;">${esc(c.paciente)}</div><div class="text-muted" style="font-size:.8rem;">${fmtTime(c.horaInicio)} · ${esc(c.documentoPaciente)}</div></div></div>
+        <a class="btn btn-outline btn-sm" href="patient-profile.html?doc=${encodeURIComponent(c.documentoPaciente)}">Record</a></div>`).join('');
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

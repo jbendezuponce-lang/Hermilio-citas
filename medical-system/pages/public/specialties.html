@@ -37,40 +37,29 @@
 <div id="footer-mount"></div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
 <script>
   renderPublicNavbar('specialties');
   renderFooter();
-
-  function renderSpecialties(list) {
-    const grid = document.getElementById('specGrid');
-    const empty = document.getElementById('specEmpty');
-    if (list.length === 0) {
-      grid.innerHTML = '';
-      empty.style.display = 'block';
-      emptyState(empty, 'fa-magnifying-glass', 'No specialties found', 'Try a different search term.');
-      return;
-    }
-    empty.style.display = 'none';
-    grid.innerHTML = list.map(s => `
-      <div class="card card-hover specialty-card">
-        <div class="spec-icon"><i class="fa-solid ${s.icon}"></i></div>
-        <h4>${s.name}</h4>
-        <p style="font-size:.85rem;">${s.description}</p>
-        <div class="count">${s.doctorCount} doctors available</div>
-        <a href="doctors.html?specialty=${s.id}" class="btn btn-outline btn-sm btn-block">View Doctors</a>
-      </div>`).join('');
-  }
-
-  const allSpecialties = DB.get(DB_KEYS.specialties);
-  renderSpecialties(allSpecialties);
-
-  document.getElementById('specSearch').addEventListener('input', debounce((e) => {
-    const term = e.target.value.toLowerCase().trim();
-    renderSpecialties(allSpecialties.filter(s => s.name.toLowerCase().includes(term) || s.description.toLowerCase().includes(term)));
-  }, 150));
+  (async () => {
+    try {
+      const specs = await Api.especialidades.list(), docs = await Api.medicos.list();
+      const grid = document.getElementById('specGrid'), empty = document.getElementById('specEmpty');
+      const count = id => docs.filter(d => d.idEspecialidad === id).length;
+      function render(list) {
+        if (!list.length) { grid.innerHTML = ''; if (empty) { empty.style.display = ''; } return; }
+        if (empty) empty.style.display = 'none';
+        grid.innerHTML = list.map(s => `<div class="card card-hover specialty-card"><div class="spec-icon"><i class="fa-solid fa-stethoscope"></i></div><h4>${esc(s.nombreEspecialidad)}</h4>
+          <p style="font-size:.85rem;">${esc(s.descripcion || '')}</p><div class="count">${count(s.idEspecialidad)} doctor(s) available</div>
+          <a href="doctors.html?specialty=${s.idEspecialidad}" class="btn btn-outline btn-sm btn-block">View Doctors</a></div>`).join('');
+      }
+      render(specs);
+      document.getElementById('specSearch').addEventListener('input', debounce((e) => { const t = e.target.value.toLowerCase().trim(); render(specs.filter(s => (s.nombreEspecialidad + ' ' + (s.descripcion || '')).toLowerCase().includes(t))); }, 150));
+    } catch (e) { fail(e); }
+  })();
 </script>
 </body>
 </html>

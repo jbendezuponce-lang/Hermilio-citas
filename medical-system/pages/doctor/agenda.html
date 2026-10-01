@@ -18,28 +18,24 @@
   <div class="main-content">
     <div id="topbar-mount"></div>
     <div class="content-area">
-      <div class="content-header"><div><h1>My Agenda</h1><p>Your confirmed, pending and completed appointments.</p></div></div>
-
-      <div class="tabs" id="viewTabs">
-        <button class="tab-btn active" data-view="day">Day</button>
-        <button class="tab-btn" data-view="week">Week</button>
-        <button class="tab-btn" data-view="month">Month</button>
+      <div class="content-header">
+        <div><h1 id="pageTitle">Daily Agenda</h1><p id="pageSub">Patients scheduled for the selected day (RF-27).</p></div>
+        
       </div>
-
-      <div class="toolbar" style="margin-top:18px;">
-        <input type="date" id="agendaDate" class="filter-select">
-        <select class="filter-select" id="statusFilter">
-          <option value="">All Statuses</option>
-          <option>Confirmed</option><option>Pending</option><option>Completed</option><option>Cancelled</option>
-        </select>
+      <div class="toolbar">
+        <button class="btn btn-outline" id="prevDay" aria-label="Previous day"><i class="fa-solid fa-chevron-left"></i></button>
+        <div class="form-group" style="margin:0;"><input type="date" id="fDate" aria-label="Date"></div>
+        <button class="btn btn-outline" id="nextDay" aria-label="Next day"><i class="fa-solid fa-chevron-right"></i></button>
+        <button class="btn btn-outline" id="todayBtn">Today</button>
       </div>
-
-      <div class="card"><div id="agendaList"></div></div>
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>Time</th><th>Patient</th><th>Document</th><th>Specialty</th><th>Location</th><th>Status</th><th>Actions</th></tr></thead><tbody id="aBody"></tbody></table></div>
+      <div id="aEmpty"></div>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -47,52 +43,33 @@
   const user = Auth.requireRole(['doctor']);
   if (user) {
     renderPortalLayout('agenda.html');
-    const patients = Object.fromEntries(DB.get(DB_KEYS.patients).map(p => [p.id, p]));
-    let view = 'day';
-    document.getElementById('agendaDate').value = today();
+    (async () => {
+      try {
 
-    function inRange(dateStr, refDate) {
-      const d = new Date(dateStr + 'T00:00:00');
-      const ref = new Date(refDate + 'T00:00:00');
-      if (view === 'day') return dateStr === refDate;
-      if (view === 'week') {
-        const start = new Date(ref); start.setDate(ref.getDate() - ref.getDay());
-        const end = new Date(start); end.setDate(start.getDate() + 6);
-        return d >= start && d <= end;
+      const sortCitas = (a, b) => (a.fecha + a.horaInicio).localeCompare(b.fecha + b.horaInicio);
+
+      const body = qs('#aBody'), empty = qs('#aEmpty');
+      qs('#fDate').value = qparam('date') || today();
+      async function load() {
+        skeletonRows(body, 4, 7);
+        const list = (await Api.citas.miAgenda(qs('#fDate').value)).sort(sortCitas);
+        if (!list.length) { body.innerHTML = ''; emptyState(empty, 'fa-calendar', 'No appointments', 'Nothing is scheduled for ' + formatDate(qs('#fDate').value) + '.'); return; }
+        empty.innerHTML = '';
+        body.innerHTML = list.map(c => `<tr><td>${fmtTime(c.horaInicio)}</td><td>${esc(c.paciente)}</td><td>${esc(c.documentoPaciente)}</td><td>${esc(c.especialidad)}</td><td>${esc(c.numeroPabellon)} · ${esc(c.codigoRoom)}</td><td>${estadoBadge(c.estado)}</td>
+          <td class="table-actions">
+            ${c.estado === 'CHECK_IN' ? `<a class="btn btn-primary btn-sm" href="consultation.html?cita=${c.idCita}" data-tooltip="Start consultation"><i class="fa-solid fa-notes-medical"></i></a>` : ''}
+            <a class="btn btn-outline btn-sm" href="patient-profile.html?doc=${encodeURIComponent(c.documentoPaciente)}" data-tooltip="Patient record"><i class="fa-solid fa-file-waveform"></i></a>
+            ${['CONFIRMADA', 'REPROGRAMADA'].includes(c.estado) && c.fecha <= today() ? `<button class="btn btn-outline btn-sm" data-id="${c.idCita}" data-tooltip="Mark no-show"><i class="fa-solid fa-user-slash"></i></button>` : ''}</td></tr>`).join('');
       }
-      if (view === 'month') return d.getMonth() === ref.getMonth() && d.getFullYear() === ref.getFullYear();
-      return false;
-    }
-
-    function render() {
-      const refDate = document.getElementById('agendaDate').value || today();
-      const status = document.getElementById('statusFilter').value;
-      const appts = DB.get(DB_KEYS.appointments)
-        .filter(a => a.doctorId === user.doctorId)
-        .filter(a => inRange(a.date, refDate))
-        .filter(a => !status || a.status === status)
-        .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
-
-      const box = document.getElementById('agendaList');
-      if (appts.length === 0) { emptyState(box, 'fa-calendar-xmark', 'No appointments found', 'Nothing scheduled in this range.'); return; }
-      box.innerHTML = appts.map(a => {
-        const p = patients[a.patientId];
-        return `<div class="calendar-day-slot">
-          <div class="time">${formatDate(a.date)}<br><span style="font-weight:400;font-size:.78rem;">${a.time}</span></div>
-          <img src="${p.photo}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" alt="">
-          <div style="flex:1;"><strong style="font-size:.9rem;">${p.name}</strong><div class="text-muted" style="font-size:.8rem;">${a.reason} · ${a.type}</div></div>
-          ${statusBadge(a.status)}
-        </div>`;
-      }).join('');
-    }
-
-    qsa('.tab-btn').forEach(b => b.addEventListener('click', () => {
-      qsa('.tab-btn').forEach(x => x.classList.remove('active'));
-      b.classList.add('active'); view = b.dataset.view; render();
-    }));
-    document.getElementById('agendaDate').addEventListener('change', render);
-    document.getElementById('statusFilter').addEventListener('change', render);
-    render();
+      body.addEventListener('click', (e) => { const b = e.target.closest('button[data-id]'); if (!b) return;
+        confirmDialog('Mark this patient as a no-show?', () => safe(async () => { await Api.citas.noAsistio(b.dataset.id); toast('Marked as no-show.', 'success'); await load(); }), { danger: true, confirmText: 'Mark no-show' }); });
+      qs('#fDate').addEventListener('change', () => safe(load));
+      qs('#prevDay').addEventListener('click', () => { qs('#fDate').value = addDays(-1, qs('#fDate').value); safe(load); });
+      qs('#nextDay').addEventListener('click', () => { qs('#fDate').value = addDays(1, qs('#fDate').value); safe(load); });
+      qs('#todayBtn').addEventListener('click', () => { qs('#fDate').value = today(); safe(load); });
+      await load();
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

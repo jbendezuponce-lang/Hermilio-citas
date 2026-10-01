@@ -19,49 +19,43 @@
     <div id="topbar-mount"></div>
     <div class="content-area">
       <div class="content-header">
-        <div><h1>Patients</h1><p>Search, create and manage patient records.</p></div>
-        <button class="btn btn-primary" id="newPatientBtn"><i class="fa-solid fa-user-plus"></i> Create Patient</button>
+        <div><h1 id="pageTitle">Patients</h1><p id="pageSub">Register new patients and look them up by document ID (RF-17, RF-18).</p></div>
+        <button class="btn btn-primary" id="newBtn"><i class="fa-solid fa-user-plus"></i> Register patient</button>
       </div>
-
-      <div class="toolbar">
-        <div class="search-input"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="pSearch" placeholder="Search by name, National ID, email..."></div>
-        <select class="filter-select" id="pStatus"><option value="">All Statuses</option><option>Active</option><option>Inactive</option></select>
-      </div>
-
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr><th>Patient</th><th>National ID</th><th>Phone</th><th>Email</th><th>Registered</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody id="pBody"></tbody>
-        </table>
-      </div>
-      <div id="pEmpty"></div>
+      <div class="card" style="max-width:760px;margin-bottom:22px;"><h4>Find a patient</h4>
+        <div class="flex gap-8"><input type="text" id="sDoc" maxlength="15" placeholder="Document ID" style="flex:1;"><button class="btn btn-primary" id="sGo"><i class="fa-solid fa-magnifying-glass"></i> Search</button></div></div>
+      <div id="result"></div>
     </div>
   </div>
 </div>
-
-<div class="modal-overlay" id="patientModal">
+<div class="modal-overlay" id="regModal">
   <div class="modal-box modal-lg">
-    <div class="modal-header"><h3 id="modalTitle">Create Patient</h3><button class="modal-close" onclick="closeModal('patientModal')">&times;</button></div>
+    <div class="modal-header"><h3 id="regTitle">Register patient</h3><button class="modal-close" onclick="closeModal('regModal')">&times;</button></div>
     <div class="modal-body">
-      <input type="hidden" id="editId">
       <div class="form-row">
-        <div class="form-group"><label for="fName">Full Name</label><input type="text" id="fName"></div>
-        <div class="form-group"><label for="fNationalId">National ID</label><input type="text" id="fNationalId"></div>
+        <div class="form-group"><label for="rNom">First names <span class="req">*</span></label><input type="text" id="rNom" maxlength="100"></div>
+        <div class="form-group"><label for="rApe">Last names <span class="req">*</span></label><input type="text" id="rApe" maxlength="100"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label for="fPhone">Phone</label><input type="tel" id="fPhone"></div>
-        <div class="form-group"><label for="fEmail">Email</label><input type="email" id="fEmail"></div>
+        <div class="form-group"><label for="rDoc">Document ID (8-15) <span class="req">*</span></label><input type="text" id="rDoc" maxlength="15"></div>
+        <div class="form-group"><label for="rCorreo">Email <span class="req">*</span></label><input type="email" id="rCorreo" maxlength="150"></div>
       </div>
-      <div class="form-group"><label for="fAddress">Address</label><input type="text" id="fAddress"></div>
+      <div class="form-row">
+        <div class="form-group"><label for="rTel">Phone</label><input type="tel" id="rTel" maxlength="20"></div>
+        <div class="form-group"><label for="rSeg">Insurance</label><input type="text" id="rSeg" maxlength="50"></div>
+      </div>
+      <div class="form-group"><label for="rApo">Guardian data</label><input type="text" id="rApo" maxlength="255"></div>
+      <div class="form-group"><label for="rPass">Password (optional)</label><input type="password" id="rPass" maxlength="72" autocomplete="new-password"><div class="form-hint">If left empty, the patient sets one with “Forgot password”.</div></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('patientModal')">Cancel</button>
-      <button class="btn btn-primary" id="saveBtn">Save Patient</button>
+      <button class="btn btn-outline" onclick="closeModal('regModal')">Cancel</button>
+      <button class="btn btn-primary" id="rSave">Register</button>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -69,91 +63,32 @@
   const user = Auth.requireRole(['receptionist']);
   if (user) {
     renderPortalLayout('patients.html');
+    (async () => {
+      try {
 
-    function render() {
-      const term = document.getElementById('pSearch').value.toLowerCase().trim();
-      const status = document.getElementById('pStatus').value;
-      const list = DB.get(DB_KEYS.patients)
-        .filter(p => !status || p.status === status)
-        .filter(p => !term || p.name.toLowerCase().includes(term) || p.nationalId.includes(term) || p.email.toLowerCase().includes(term));
-
-      const body = document.getElementById('pBody');
-      const empty = document.getElementById('pEmpty');
-      if (list.length === 0) { body.innerHTML = ''; emptyState(empty, 'fa-users', 'No patients found', 'Try a different search or create a new patient.'); return; }
-      empty.innerHTML = '';
-      body.innerHTML = list.map(p => `
-        <tr>
-          <td><div class="flex items-center gap-12"><img src="${p.photo}" class="avatar" style="width:34px;height:34px;" alt=""><span>${p.name}</span></div></td>
-          <td>${p.nationalId}</td>
-          <td>${p.phone}</td>
-          <td>${p.email}</td>
-          <td>${formatDate(p.registered)}</td>
-          <td>${statusBadge(p.status)}</td>
-          <td class="table-actions">
-            <button class="btn btn-outline btn-sm edit-btn" data-id="${p.id}" data-tooltip="Edit"><i class="fa-solid fa-pen"></i></button>
-            <button class="btn btn-outline btn-sm toggle-btn" data-id="${p.id}" data-tooltip="${p.status === 'Active' ? 'Deactivate' : 'Activate'}"><i class="fa-solid ${p.status === 'Active' ? 'fa-user-slash' : 'fa-user-check'}"></i></button>
-          </td>
-        </tr>`).join('');
-
-      qsa('.edit-btn').forEach(b => b.addEventListener('click', () => openEdit(b.dataset.id)));
-      qsa('.toggle-btn').forEach(b => b.addEventListener('click', () => {
-        const p = DB.find(DB_KEYS.patients, b.dataset.id);
-        const newStatus = p.status === 'Active' ? 'Inactive' : 'Active';
-        DB.update(DB_KEYS.patients, p.id, { status: newStatus });
-        addAuditLog(user.name, (newStatus === 'Active' ? 'Activated' : 'Deactivated') + ' patient', 'Patients');
-        toast(`Patient ${newStatus === 'Active' ? 'activated' : 'deactivated'}.`, 'success');
-        render();
-      }));
-    }
-
-    function openEdit(id) {
-      const p = DB.find(DB_KEYS.patients, id);
-      document.getElementById('modalTitle').textContent = 'Edit Patient';
-      document.getElementById('editId').value = id;
-      document.getElementById('fName').value = p.name;
-      document.getElementById('fNationalId').value = p.nationalId;
-      document.getElementById('fPhone').value = p.phone;
-      document.getElementById('fEmail').value = p.email;
-      document.getElementById('fAddress').value = p.address;
-      openModal('patientModal');
-    }
-
-    document.getElementById('newPatientBtn').addEventListener('click', () => {
-      document.getElementById('modalTitle').textContent = 'Create Patient';
-      ['editId', 'fName', 'fNationalId', 'fPhone', 'fEmail', 'fAddress'].forEach(id => document.getElementById(id).value = '');
-      openModal('patientModal');
-    });
-
-    document.getElementById('saveBtn').addEventListener('click', () => {
-      const id = document.getElementById('editId').value;
-      const name = document.getElementById('fName').value.trim();
-      const email = document.getElementById('fEmail').value.trim();
-      const phone = document.getElementById('fPhone').value.trim();
-      if (!name) { toast('Name is required.', 'error'); return; }
-      if (!isValidEmail(email)) { toast('Enter a valid email.', 'error'); return; }
-      if (!isValidPhone(phone)) { toast('Enter a valid phone.', 'error'); return; }
-
-      const data = { name, nationalId: document.getElementById('fNationalId').value.trim(), phone, email, address: document.getElementById('fAddress').value.trim() };
-
-      if (id) {
-        DB.update(DB_KEYS.patients, id, data);
-        addAuditLog(user.name, 'Updated patient information', 'Patients');
-        toast('Patient updated successfully!', 'success');
-      } else {
-        const newId = 'pat-' + Date.now().toString().slice(-6);
-        DB.insert(DB_KEYS.patients, { id: newId, userId: null, ...data, dob: '', gender: '', photo: `https://i.pravatar.cc/300?img=${Math.floor(Math.random()*60)+1}`, registered: today(), status: 'Active', allergies: ['Not specified'], bloodType: 'Unknown' });
-        addAuditLog(user.name, 'Created patient record', 'Patients');
-        toast('Patient created successfully!', 'success');
+      const val = id => document.getElementById(id).value.trim();
+      const show = (p) => qs('#result').innerHTML = `<div class="card" style="max-width:760px;"><div class="flex items-center gap-16" style="margin-bottom:14px;"><span class="avatar-lg">${initials(fullName(p))}</span><div><h3 style="margin:0;">${esc(fullName(p))}</h3><div class="text-muted">Document ${esc(p.documentoIdentidad)}</div></div></div>
+        <table class="data-table" style="min-width:0;"><tbody><tr><td style="font-weight:600;width:160px;">Email</td><td>${esc(p.correo)}</td></tr><tr><td style="font-weight:600;">Phone</td><td>${esc(p.telefonoContacto || '—')}</td></tr>
+        <tr><td style="font-weight:600;">Insurance</td><td>${esc(p.tipoSeguro || '—')}</td></tr><tr><td style="font-weight:600;">Guardian data</td><td>${esc(p.datosApoderado || '—')}</td></tr></tbody></table>
+        <a href="appointments.html" class="btn btn-outline" style="margin-top:16px;"><i class="fa-solid fa-calendar-plus"></i> Go to appointments</a></div>`;
+      async function search() {
+        const d = val('sDoc'); if (!d) { toast('Enter a document ID.', 'error'); return; }
+        try { show(await Api.pacientes.buscar(d)); }
+        catch (e) { if (e.status === 404) emptyState(qs('#result'), 'fa-user-slash', 'Patient not found', 'No patient is registered with that document ID. You can register a new one.'); else throw e; }
       }
-      closeModal('patientModal');
-      render();
-    });
-
-    ['pSearch', 'pStatus'].forEach(id => {
-      document.getElementById(id).addEventListener('input', debounce(render, 150));
-      document.getElementById(id).addEventListener('change', render);
-    });
-    render();
+      qs('#sGo').addEventListener('click', () => safe(search));
+      qs('#sDoc').addEventListener('keydown', (e) => { if (e.key === 'Enter') safe(search); });
+      qs('#newBtn').addEventListener('click', () => { ['rNom', 'rApe', 'rDoc', 'rCorreo', 'rTel', 'rSeg', 'rApo', 'rPass'].forEach(i => document.getElementById(i).value = ''); qs('#rDoc').value = val('sDoc'); openModal('regModal'); });
+      qs('#rSave').addEventListener('click', () => safe(async () => {
+        if (!val('rNom') || !val('rApe')) { toast('First and last names are required.', 'error'); return; }
+        if (val('rDoc').length < 8) { toast('Document ID must have 8 to 15 characters.', 'error'); return; }
+        if (!isValidEmail(val('rCorreo'))) { toast('Enter a valid email.', 'error'); return; }
+        const pass = qs('#rPass').value;
+        const p = await Api.pacientes.registrar({ documentoIdentidad: val('rDoc'), nombres: val('rNom'), apellidos: val('rApe'), correo: val('rCorreo'), password: pass || null, tipoSeguro: val('rSeg') || null, telefonoContacto: val('rTel') || null, datosApoderado: val('rApo') || null });
+        toast('Patient registered and saved in the database.', 'success'); closeModal('regModal'); show(p);
+      }));
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

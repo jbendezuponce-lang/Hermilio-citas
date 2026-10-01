@@ -18,83 +18,57 @@
   <div class="main-content">
     <div id="topbar-mount"></div>
     <div class="content-area">
-      <div class="breadcrumbs">
-        <a href="appointments.html">My Appointments</a><span class="sep">/</span><span class="current">Reschedule</span>
+      <div class="content-header">
+        <div><h1 id="pageTitle">Reschedule Appointment</h1><p id="pageSub">Pick another free time slot of the same specialty.</p></div>
+        
       </div>
-      <div id="rescheduleWrap"></div>
+      <div class="card" style="max-width:900px;">
+        <div id="curBox" style="margin-bottom:22px;"></div>
+        <h3>Choose a new date</h3><div class="slot-grid" id="dateSlots"></div><p class="form-hint" id="dateHint"></p>
+        <div id="timeWrap" style="display:none;margin-top:22px;"><h3>Choose a new time</h3><div id="timeSlots"></div></div>
+        <div class="flex gap-12" style="margin-top:26px;"><a href="appointments.html" class="btn btn-ghost">Cancel</a><button class="btn btn-primary" id="confirmBtn" disabled><i class="fa-solid fa-check"></i> Confirm new time</button></div>
+      </div>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
 <script>
   const user = Auth.requireRole(['patient']);
   if (user) {
-    renderPortalLayout('appointments.html');
-    const id = new URLSearchParams(window.location.search).get('id');
-    const appt = DB.find(DB_KEYS.appointments, id);
-    const wrap = document.getElementById('rescheduleWrap');
+    renderPortalLayout('reschedule.html');
+    (async () => {
+      try {
 
-    if (!appt || appt.patientId !== user.patientId) {
-      emptyState(wrap, 'fa-calendar-xmark', 'Appointment not found', 'This appointment does not exist or is not yours.');
-    } else {
-      const doc = DB.find(DB_KEYS.doctors, appt.doctorId);
-      let selectedDate = appt.date;
-      let selectedTime = null;
+      const specIcon = (n) => { n = (n || '').toLowerCase(); return n.includes('psiq') ? 'fa-brain' : n.includes('psic') ? 'fa-comments' : n.includes('pedi') ? 'fa-child-reaching' : n.includes('cardi') ? 'fa-heart-pulse' : 'fa-stethoscope'; };
+      const sortCitas = (a, b) => (a.fecha + a.horaInicio).localeCompare(b.fecha + b.horaInicio);
+      const ACTIVAS = ['CONFIRMADA', 'REPROGRAMADA', 'CHECK_IN'];
 
-      wrap.innerHTML = `
-        <div class="card" style="max-width:640px;">
-          <div class="flex items-center gap-12" style="margin-bottom:20px;">
-            <img src="${doc.photo}" class="avatar" alt="Portrait of ${doc.name}">
-            <div><strong>${doc.name}</strong><div class="text-muted" style="font-size:.85rem;">Current: ${formatDate(appt.date)} at ${appt.time}</div></div>
-          </div>
-          <div class="form-group" style="max-width:260px;">
-            <label for="newDate">New Date</label>
-            <input type="date" id="newDate" min="${today()}" value="${appt.date}">
-          </div>
-          <label>New Time</label>
-          <div class="slot-grid" id="rescheduleSlots" style="margin-bottom:24px;"></div>
-          <div class="flex gap-12">
-            <button class="btn btn-primary" id="confirmReschedule">Confirm Change</button>
-            <a href="appointments.html" class="btn btn-ghost">Cancel</a>
-          </div>
-        </div>`;
-
-      function renderSlots() {
-        const allSlots = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'];
-        const taken = DB.get(DB_KEYS.appointments)
-          .filter(a => a.doctorId === appt.doctorId && a.date === selectedDate && a.status !== 'Cancelled' && a.id !== appt.id)
-          .map(a => a.time);
-        document.getElementById('rescheduleSlots').innerHTML = allSlots.map(t => `
-          <button type="button" class="slot-btn ${selectedTime === t ? 'selected' : ''}" data-time="${t}" ${taken.includes(t) ? 'disabled' : ''}>${t}</button>`).join('');
-        qsa('#rescheduleSlots .slot-btn:not(:disabled)').forEach(btn => {
-          btn.addEventListener('click', () => {
-            qsa('#rescheduleSlots .slot-btn').forEach(b => b.classList.remove('selected'));
-            btn.classList.add('selected');
-            selectedTime = btn.dataset.time;
-          });
-        });
-      }
-      renderSlots();
-
-      document.getElementById('newDate').addEventListener('input', (e) => {
-        selectedDate = e.target.value;
-        selectedTime = null;
-        renderSlots();
-      });
-
-      document.getElementById('confirmReschedule').addEventListener('click', () => {
-        if (!selectedDate || !selectedTime) { toast('Please select a date and time.', 'error'); return; }
-        DB.update(DB_KEYS.appointments, appt.id, { date: selectedDate, time: selectedTime, status: 'Pending' });
-        addNotification(user.id, 'Appointment rescheduled', `Your appointment with ${doc.name} was moved to ${formatDate(selectedDate)} at ${selectedTime}.`, 'appointment');
-        addAuditLog(user.name, 'Rescheduled appointment', 'Appointments');
-        toast('Appointment rescheduled successfully!', 'success');
-        setTimeout(() => window.location.href = 'appointments.html', 900);
-      });
-    }
+      const id = qparam('id');
+      if (!id) { emptyState(qs('#curBox'), 'fa-calendar-xmark', 'Appointment not found', 'Open it from “My Appointments”.'); return; }
+      const c = await Api.citas.obtener(id);
+      if (!['CONFIRMADA', 'REPROGRAMADA'].includes(c.estado)) { emptyState(qs('#curBox'), 'fa-ban', 'This appointment cannot be rescheduled', 'Only confirmed or rescheduled appointments can be moved.'); return; }
+      qs('#curBox').innerHTML = `<div class="alert alert-info"><strong>Current appointment:</strong> ${esc(c.medico)} (${esc(c.especialidad)}) · ${formatDate(c.fecha)} at ${fmtTime(c.horaInicio)}</div>`;
+      const slots = (await Api.horarios.disponibles(c.idEspecialidad)).filter(h => h.idHorario !== c.idHorario);
+      let fecha = null, sel = null;
+      const dates = [...new Set(slots.map(h => h.fecha))].sort();
+      if (!dates.length) qs('#dateHint').textContent = 'There are no free slots for this specialty right now.';
+      qs('#dateSlots').innerHTML = dates.map(d => `<button type="button" class="slot-btn" data-d="${d}">${new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</button>`).join('');
+      qsa('#dateSlots .slot-btn').forEach(b => b.addEventListener('click', () => {
+        qsa('#dateSlots .slot-btn').forEach(x => x.classList.remove('selected')); b.classList.add('selected'); fecha = b.dataset.d; sel = null; qs('#confirmBtn').disabled = true;
+        qs('#timeWrap').style.display = 'block';
+        qs('#timeSlots').innerHTML = `<div class="slot-grid">${slots.filter(h => h.fecha === fecha).map(h => `<button type="button" class="slot-btn" data-id="${h.idHorario}" title="${esc(h.medico)}">${fmtTime(h.horaInicio)} · ${esc(h.medico.split(' ')[0])}</button>`).join('')}</div>`;
+        qsa('#timeSlots .slot-btn').forEach(t => t.addEventListener('click', () => { qsa('#timeSlots .slot-btn').forEach(x => x.classList.remove('selected')); t.classList.add('selected'); sel = t.dataset.id; qs('#confirmBtn').disabled = false; }));
+      }));
+      qs('#confirmBtn').addEventListener('click', () => safe(async () => {
+        await Api.citas.reprogramar(c.idCita, Number(sel)); toast('Appointment rescheduled.', 'success'); setTimeout(() => location.href = 'appointments.html', 800);
+      }));
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

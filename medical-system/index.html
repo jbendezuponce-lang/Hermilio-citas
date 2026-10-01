@@ -186,6 +186,7 @@
 <div id="footer-mount"></div>
 
 <script src="js/data.js"></script>
+<script src="js/api.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/navigation.js"></script>
@@ -193,33 +194,19 @@
   renderPublicNavbar('home');
   renderFooter();
 
-  const specialties = DB.get(DB_KEYS.specialties).slice(0, 4);
-  document.getElementById('homeSpecialtiesGrid').innerHTML = specialties.map(s => `
-    <div class="card card-hover specialty-card">
-      <div class="spec-icon"><i class="fa-solid ${s.icon}"></i></div>
-      <h4>${s.name}</h4>
-      <p style="font-size:.85rem;">${s.description}</p>
-      <div class="count">${s.doctorCount} doctors available</div>
-      <a href="pages/public/doctors.html?specialty=${s.id}" class="btn btn-outline btn-sm btn-block">View Doctors</a>
-    </div>`).join('');
-
-  const doctors = DB.get(DB_KEYS.doctors).slice(0, 4);
-  const specMap = Object.fromEntries(DB.get(DB_KEYS.specialties).map(s => [s.id, s.name]));
-  document.getElementById('homeDoctorsGrid').innerHTML = doctors.map(d => `
-    <div class="card card-hover doctor-card">
-      <img src="${d.photo}" alt="Portrait of ${d.name}" class="doc-photo">
-      <div class="doc-body">
-        <div class="doc-name">${d.name}</div>
-        <div class="doc-spec">${specMap[d.specialtyId]}</div>
-        <div class="doc-meta">
-          <span><i class="fa-solid fa-star rating-stars"></i> ${d.rating}</span>
-          <span><i class="fa-solid fa-briefcase-medical"></i> ${d.experience} yrs</span>
-        </div>
-        <div class="doc-actions">
-          <a href="pages/public/doctor-profile.html?id=${d.id}" class="btn btn-outline btn-sm btn-block">View Profile</a>
-        </div>
-      </div>
-    </div>`).join('');
+  (async () => {
+    try {
+      const [specs, docs] = await Promise.all([Api.especialidades.list(), Api.medicos.list()]);
+      document.getElementById('homeSpecialtiesGrid').innerHTML = specs.slice(0, 4).map(s => `
+        <div class="card card-hover specialty-card"><div class="spec-icon"><i class="fa-solid fa-stethoscope"></i></div><h4>${esc(s.nombreEspecialidad)}</h4>
+          <p style="font-size:.85rem;">${esc(s.descripcion || '')}</p><div class="count">${docs.filter(d => d.idEspecialidad === s.idEspecialidad).length} doctor(s) available</div>
+          <a href="pages/public/doctors.html?specialty=${s.idEspecialidad}" class="btn btn-outline btn-sm btn-block">View Doctors</a></div>`).join('');
+      document.getElementById('homeDoctorsGrid').innerHTML = docs.slice(0, 4).map(d => `
+        <div class="card card-hover doctor-card"><div class="doc-body" style="text-align:center;"><span class="avatar-lg" style="margin:0 auto 12px;">${initials(fullName(d))}</span>
+          <div class="doc-name">${esc(fullName(d))}</div><div class="doc-spec">${esc(d.especialidad)}</div>
+          <div class="doc-actions"><a href="pages/public/doctor-profile.html?id=${d.idMedico}" class="btn btn-outline btn-sm btn-block">View Profile</a></div></div></div>`).join('');
+    } catch (e) { console.warn('No se pudieron cargar los catálogos públicos:', e.message); }
+  })();
 
   const faqs = [
     { q: 'Is MediCare+ free to use for patients?', a: 'Yes, creating a patient account and booking appointments is completely free.' },

@@ -19,23 +19,23 @@
     <div id="topbar-mount"></div>
     <div class="content-area">
       <div class="content-header">
-        <div><h1>My Appointments</h1><p>Manage your upcoming and past visits.</p></div>
+        <div><h1 id="pageTitle">My Appointments</h1><p id="pageSub">View, reschedule or cancel your appointments.</p></div>
         <a href="book-appointment.html" class="btn btn-primary"><i class="fa-solid fa-calendar-plus"></i> Book Appointment</a>
       </div>
-
-      <div class="tabs" id="apptTabs">
-        <button class="tab-btn active" data-tab="Confirmed">Upcoming</button>
-        <button class="tab-btn" data-tab="Pending">Pending</button>
-        <button class="tab-btn" data-tab="Completed">Completed</button>
-        <button class="tab-btn" data-tab="Cancelled">Cancelled</button>
+      <div class="toolbar">
+        <div class="search-input"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="aSearch" placeholder="Search by doctor or specialty..."></div>
+        <select class="filter-select" id="aFilter"><option value="">All</option><option value="up">Upcoming</option><option value="past">Past</option><option value="CANCELADA">Cancelled</option></select>
       </div>
-
-      <div id="apptListWrap" style="margin-top:20px;"></div>
+      <div class="table-wrap"><table class="data-table">
+        <thead><tr><th>Doctor</th><th>Specialty</th><th>Date</th><th>Time</th><th>Location</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="aBody"></tbody></table></div>
+      <div id="aEmpty"></div>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -43,63 +43,40 @@
   const user = Auth.requireRole(['patient']);
   if (user) {
     renderPortalLayout('appointments.html');
-    const doctors = Object.fromEntries(DB.get(DB_KEYS.doctors).map(d => [d.id, d]));
-    const specMap = Object.fromEntries(DB.get(DB_KEYS.specialties).map(s => [s.id, s.name]));
-    const locMap = Object.fromEntries(DB.get(DB_KEYS.locations).map(l => [l.id, l.name]));
-    let activeTab = 'Confirmed';
+    (async () => {
+      try {
 
-    function render() {
-      const appts = DB.get(DB_KEYS.appointments)
-        .filter(a => a.patientId === user.patientId && a.status === activeTab)
-        .sort((a, b) => activeTab === 'Completed' || activeTab === 'Cancelled' ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date));
+      const specIcon = (n) => { n = (n || '').toLowerCase(); return n.includes('psiq') ? 'fa-brain' : n.includes('psic') ? 'fa-comments' : n.includes('pedi') ? 'fa-child-reaching' : n.includes('cardi') ? 'fa-heart-pulse' : 'fa-stethoscope'; };
+      const sortCitas = (a, b) => (a.fecha + a.horaInicio).localeCompare(b.fecha + b.horaInicio);
+      const ACTIVAS = ['CONFIRMADA', 'REPROGRAMADA', 'CHECK_IN'];
 
-      const wrap = document.getElementById('apptListWrap');
-      if (appts.length === 0) {
-        wrap.innerHTML = '';
-        emptyState(wrap, 'fa-calendar-xmark', `No ${activeTab.toLowerCase()} appointments`, 'There is nothing to show in this category yet.');
-        return;
+      const body = qs('#aBody'), empty = qs('#aEmpty');
+      let citas = [];
+      async function load() { skeletonRows(body, 4, 7); citas = (await Api.citas.mias()).sort((a, b) => sortCitas(b, a)); render(); }
+      function render() {
+        const term = qs('#aSearch').value.toLowerCase().trim(), f = qs('#aFilter').value;
+        const list = citas.filter(c => !term || (c.medico + ' ' + c.especialidad).toLowerCase().includes(term))
+          .filter(c => !f || (f === 'up' ? ACTIVAS.includes(c.estado) && c.fecha >= today() : f === 'past' ? (c.fecha < today() || c.estado === 'ATENDIDA') && c.estado !== 'CANCELADA' : c.estado === f));
+        if (!list.length) { body.innerHTML = ''; emptyState(empty, 'fa-calendar-xmark', 'No appointments found', 'Book your first appointment from “Book Appointment”.'); return; }
+        empty.innerHTML = '';
+        body.innerHTML = list.map(c => {
+          const editable = ['CONFIRMADA', 'REPROGRAMADA'].includes(c.estado) && c.fecha >= today();
+          return `<tr><td><div class="flex items-center gap-12"><span class="avatar-sm">${initials(c.medico)}</span><span>${esc(c.medico)}</span></div></td>
+            <td>${esc(c.especialidad)}</td><td>${formatDate(c.fecha)}</td><td>${fmtTime(c.horaInicio)}</td><td>${esc(c.numeroPabellon)} · ${esc(c.codigoRoom)}</td><td>${estadoBadge(c.estado)}</td>
+            <td class="table-actions"><a class="btn btn-outline btn-sm" href="appointment-details.html?id=${c.idCita}" data-tooltip="Details"><i class="fa-solid fa-eye"></i></a>
+              ${editable ? `<a class="btn btn-outline btn-sm" href="reschedule.html?id=${c.idCita}" data-tooltip="Reschedule"><i class="fa-solid fa-calendar-days"></i></a>
+              <button class="btn btn-danger btn-sm" data-id="${c.idCita}" data-tooltip="Cancel"><i class="fa-solid fa-xmark"></i></button>` : ''}</td></tr>`; }).join('');
       }
-      wrap.innerHTML = `<div class="table-wrap"><table class="data-table">
-        <thead><tr><th>Doctor</th><th>Specialty</th><th>Date</th><th>Time</th><th>Type</th><th>Location</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody>${appts.map(a => {
-          const doc = doctors[a.doctorId];
-          return `<tr>
-            <td><div class="flex items-center gap-12"><img src="${doc.photo}" class="avatar" style="width:34px;height:34px;" alt=""><span>${doc.name}</span></div></td>
-            <td>${specMap[a.specialtyId]}</td>
-            <td>${formatDate(a.date)}</td>
-            <td>${a.time}</td>
-            <td>${a.type}</td>
-            <td>${locMap[a.locationId]}</td>
-            <td>${statusBadge(a.status)}</td>
-            <td class="table-actions">
-              <a href="appointment-details.html?id=${a.id}" class="btn btn-outline btn-sm" data-tooltip="View details"><i class="fa-solid fa-eye"></i></a>
-              ${(a.status === 'Confirmed' || a.status === 'Pending') ? `
-                <a href="reschedule.html?id=${a.id}" class="btn btn-outline btn-sm" data-tooltip="Reschedule"><i class="fa-solid fa-calendar-days"></i></a>
-                <button class="btn btn-danger btn-sm cancel-btn" data-id="${a.id}" data-tooltip="Cancel"><i class="fa-solid fa-xmark"></i></button>` : ''}
-            </td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table></div>`;
-
-      qsa('.cancel-btn').forEach(btn => btn.addEventListener('click', () => {
-        confirmDialog('Are you sure you want to cancel this appointment? This action cannot be undone.', () => {
-          DB.update(DB_KEYS.appointments, btn.dataset.id, { status: 'Cancelled' });
-          addNotification(user.id, 'Appointment cancelled', 'Your appointment has been cancelled successfully.', 'appointment');
-          addAuditLog(user.name, 'Cancelled appointment', 'Appointments');
-          toast('Appointment cancelled.', 'success');
-          render();
-        }, { danger: true, confirmText: 'Cancel Appointment' });
-      }));
-    }
-
-    qsa('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
-      qsa('.tab-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      activeTab = btn.dataset.tab;
-      render();
-    }));
-
-    render();
+      body.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-id]'); if (!b) return;
+        confirmDialog('Cancel this appointment? The time slot will be released immediately.', () => safe(async () => {
+          await Api.citas.cancelar(b.dataset.id); toast('Appointment cancelled.', 'success'); await load();
+        }), { danger: true, confirmText: 'Cancel appointment' });
+      });
+      qs('#aSearch').addEventListener('input', debounce(render, 150)); qs('#aFilter').addEventListener('change', render);
+      await load();
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

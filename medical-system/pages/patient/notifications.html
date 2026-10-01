@@ -19,15 +19,16 @@
     <div id="topbar-mount"></div>
     <div class="content-area">
       <div class="content-header">
-        <div><h1>Notifications</h1><p>Stay up to date with your appointments and records.</p></div>
-        <button class="btn btn-outline" id="markAllBtn">Mark all as read</button>
+        <div><h1 id="pageTitle">Notifications</h1><p id="pageSub">Confirmations, reminders and changes to your appointments.</p></div>
+        
       </div>
-      <div class="card" id="notifWrap"></div>
+<div id="nBox"></div>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -35,39 +36,31 @@
   const user = Auth.requireRole(['patient']);
   if (user) {
     renderPortalLayout('notifications.html');
-    const iconMap = { appointment: 'fa-calendar-check', document: 'fa-file-medical', schedule: 'fa-clock', system: 'fa-gear' };
+    (async () => {
+      try {
 
-    function render() {
-      const notifs = DB.get(DB_KEYS.notifications).filter(n => n.userId === user.id).sort((a, b) => b.date.localeCompare(a.date));
-      const wrap = document.getElementById('notifWrap');
-      if (notifs.length === 0) { emptyState(wrap, 'fa-bell-slash', 'No notifications', "You're all caught up!"); return; }
-      wrap.innerHTML = notifs.map(n => `
-        <div class="flex items-start justify-between" style="padding:16px 4px;border-bottom:1px solid var(--color-border);gap:14px;">
-          <div class="flex items-start gap-12">
-            <div class="stat-icon ${n.read ? 'blue' : 'teal'}" style="width:40px;height:40px;font-size:1rem;"><i class="fa-solid ${iconMap[n.type] || 'fa-bell'}"></i></div>
-            <div>
-              <div style="font-weight:700;font-size:.92rem;">${n.title}</div>
-              <div class="text-muted" style="font-size:.86rem;">${n.message}</div>
-              <div class="text-muted" style="font-size:.76rem;margin-top:4px;">${formatDate(n.date)}</div>
-            </div>
-          </div>
-          <div class="flex gap-8">
-            ${!n.read ? `<button class="btn btn-outline btn-sm read-btn" data-id="${n.id}">Mark read</button>` : ''}
-            <button class="btn btn-ghost btn-sm delete-btn" data-id="${n.id}"><i class="fa-solid fa-trash"></i></button>
-          </div>
-        </div>`).join('');
-
-      qsa('.read-btn').forEach(b => b.addEventListener('click', () => { DB.update(DB_KEYS.notifications, b.dataset.id, { read: true }); render(); }));
-      qsa('.delete-btn').forEach(b => b.addEventListener('click', () => { DB.remove(DB_KEYS.notifications, b.dataset.id); toast('Notification deleted.', 'success'); render(); }));
-    }
-
-    document.getElementById('markAllBtn').addEventListener('click', () => {
-      DB.get(DB_KEYS.notifications).filter(n => n.userId === user.id).forEach(n => DB.update(DB_KEYS.notifications, n.id, { read: true }));
-      toast('All notifications marked as read.', 'success');
-      render();
-    });
-
-    render();
+      const box = qs('#nBox');
+      const ICON = { CONFIRMACION: ['fa-circle-check', '#16a34a', 'Appointment confirmed'], RECORDATORIO: ['fa-bell', '#d97706', 'Appointment reminder'], REPROGRAMACION: ['fa-calendar-days', '#7c3aed', 'Appointment rescheduled'], CANCELACION: ['fa-calendar-xmark', '#dc2626', 'Appointment cancelled'] };
+      let list = [];
+      async function load() {
+        list = await Api.notificaciones.mias();
+        if (!list.length) { emptyState(box, 'fa-bell-slash', 'No notifications', "You're all caught up!"); return; }
+        box.innerHTML = `<div class="card">${list.map(n => { const i = ICON[n.tipo] || ['fa-bell', '#64767d', n.tipo]; return `
+          <div class="flex items-center gap-16" style="padding:14px 0;border-bottom:1px solid var(--color-border);${n.leido ? 'opacity:.7;' : ''}">
+            <span class="stat-icon" style="width:42px;height:42px;background:${i[1]}22;color:${i[1]};"><i class="fa-solid ${i[0]}"></i></span>
+            <div style="flex:1;"><div style="font-weight:600;">${esc(i[2])} ${n.leido ? '' : '<span class="badge badge-blue">New</span>'}</div><div class="text-muted" style="font-size:.88rem;">${esc(n.mensaje)}</div>
+              <div class="text-muted" style="font-size:.78rem;">${formatDateTime(n.fechaEnvio)}</div></div>
+            ${n.leido ? '' : `<button class="btn btn-outline btn-sm" data-id="${n.idNotificacion}">Mark as read</button>`}</div>`; }).join('')}</div>
+          ${list.some(n => !n.leido) ? '<button class="btn btn-primary" id="readAll" style="margin-top:16px;">Mark all as read</button>' : ''}`;
+      }
+      box.addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-id]');
+        if (b) safe(async () => { await Api.notificaciones.leida(b.dataset.id); await load(); });
+        if (e.target.closest('#readAll')) safe(async () => { for (const n of list.filter(x => !x.leido)) await Api.notificaciones.leida(n.idNotificacion); await load(); });
+      });
+      await load();
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

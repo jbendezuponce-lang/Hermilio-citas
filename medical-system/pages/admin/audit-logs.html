@@ -18,27 +18,31 @@
   <div class="main-content">
     <div id="topbar-mount"></div>
     <div class="content-area">
-      <div class="content-header"><div><h1>Audit Logs</h1><p>System activity trail for compliance and troubleshooting.</p></div></div>
-
-      <div class="toolbar">
-        <div class="search-input"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="lSearch" placeholder="Search by user or action..."></div>
-        <select class="filter-select" id="lModule"><option value="">All Modules</option></select>
-        <input type="date" id="lFrom" class="filter-select">
-        <input type="date" id="lTo" class="filter-select">
+      <div class="content-header">
+        <div><h1 id="pageTitle">Audit Logs</h1><p id="pageSub">Traceability of accesses and changes (max. 500 records per query).</p></div>
+        
       </div>
-
+      <div class="toolbar">
+        <div class="form-group" style="margin:0;"><label for="aFrom" style="font-size:.8rem;">From</label><input type="date" id="aFrom"></div>
+        <div class="form-group" style="margin:0;"><label for="aTo" style="font-size:.8rem;">To</label><input type="date" id="aTo"></div>
+        <select class="filter-select" id="aUser"><option value="">All users</option></select>
+        <div class="search-input"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="aSearch" placeholder="Filter by action..."></div>
+        <button class="btn btn-primary" id="aGo"><i class="fa-solid fa-rotate"></i> Load</button>
+        <button class="btn btn-outline" id="aCsv"><i class="fa-solid fa-file-csv"></i> CSV</button>
+      </div>
       <div class="table-wrap">
         <table class="data-table">
-          <thead><tr><th>User</th><th>Action</th><th>Module</th><th>Date</th><th>Time</th><th>Status</th></tr></thead>
-          <tbody id="lBody"></tbody>
+          <thead><tr><th>Date &amp; time</th><th>User</th><th>Action</th></tr></thead>
+          <tbody id="aBody"></tbody>
         </table>
       </div>
-      <div id="lEmpty"></div>
+      <div id="aEmpty"></div>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -46,43 +50,37 @@
   const user = Auth.requireRole(['admin']);
   if (user) {
     renderPortalLayout('audit-logs.html');
-    const logs = DB.get(DB_KEYS.auditLogs);
-    const modules = [...new Set(logs.map(l => l.module))];
-    document.getElementById('lModule').innerHTML += modules.map(m => `<option value="${m}">${m}</option>`).join('');
+    (async () => {
+      try {
 
-    function render() {
-      const term = document.getElementById('lSearch').value.toLowerCase().trim();
-      const module = document.getElementById('lModule').value;
-      const from = document.getElementById('lFrom').value;
-      const to = document.getElementById('lTo').value;
-
-      const list = DB.get(DB_KEYS.auditLogs)
-        .filter(l => !module || l.module === module)
-        .filter(l => !from || l.date >= from)
-        .filter(l => !to || l.date <= to)
-        .filter(l => !term || l.user.toLowerCase().includes(term) || l.action.toLowerCase().includes(term))
-        .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
-
-      const body = document.getElementById('lBody');
-      const empty = document.getElementById('lEmpty');
-      if (list.length === 0) { body.innerHTML = ''; emptyState(empty, 'fa-list-check', 'No log entries found', 'Try adjusting your filters.'); return; }
-      empty.innerHTML = '';
-      body.innerHTML = list.map(l => `
-        <tr>
-          <td>${l.user}</td>
-          <td>${l.action}</td>
-          <td><span class="badge badge-gray">${l.module}</span></td>
-          <td>${formatDate(l.date)}</td>
-          <td>${l.time}</td>
-          <td>${statusBadge(l.status)}</td>
-        </tr>`).join('');
-    }
-
-    ['lSearch', 'lModule', 'lFrom', 'lTo'].forEach(id => {
-      document.getElementById(id).addEventListener('input', debounce(render, 150));
-      document.getElementById(id).addEventListener('change', render);
-    });
-    render();
+      const body = qs('#aBody'), empty = qs('#aEmpty');
+      const val = id => document.getElementById(id).value.trim();
+      const users = await Api.usuarios.list();
+      qs('#aUser').innerHTML = '<option value="">All users</option>' + users.map(u => `<option value="${u.idUsuario}">${esc(fullName(u))} (${esc(u.correo)})</option>`).join('');
+      qs('#aFrom').value = addDays(-7); qs('#aTo').value = today();
+      let rows = [];
+      async function load() {
+        if (!val('aFrom') || !val('aTo') || val('aFrom') > val('aTo')) { toast('Check the date range.', 'error'); return; }
+        skeletonRows(body, 5, 3);
+        rows = await Api.reportes.auditoria(val('aFrom'), val('aTo'), val('aUser'));
+        render();
+      }
+      function render() {
+        const term = val('aSearch').toLowerCase();
+        const list = rows.filter(r => !term || (r.accion + ' ' + (r.correoUsuario || '')).toLowerCase().includes(term));
+        if (list.length === 0) { body.innerHTML = ''; emptyState(empty, 'fa-list-check', 'No audit records', 'Nothing was logged in this period.'); return; }
+        empty.innerHTML = '';
+        body.innerHTML = list.map(r => `<tr><td>${formatDateTime(r.fechaHora)}</td><td>${esc(r.correoUsuario || '—')}</td><td>${esc(r.accion)}</td></tr>`).join('');
+      }
+      qs('#aGo').addEventListener('click', () => safe(load));
+      qs('#aSearch').addEventListener('input', debounce(render, 150));
+      qs('#aCsv').addEventListener('click', () => {
+        if (!rows.length) { toast('Nothing to export.', 'info'); return; }
+        downloadFile(`audit_${val('aFrom')}_${val('aTo')}.csv`, toCsv([['Date', 'User', 'Action'], ...rows.map(r => [r.fechaHora, r.correoUsuario, r.accion])]));
+      });
+      await load();
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

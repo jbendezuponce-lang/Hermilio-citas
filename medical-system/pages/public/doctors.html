@@ -24,22 +24,8 @@
 <section class="section" style="padding-top:40px;">
   <div class="container">
     <div class="toolbar">
-      <div class="search-input">
-        <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="search" id="docSearch" placeholder="Search by doctor name...">
-      </div>
+      <div class="search-input"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="docSearch" placeholder="Search by doctor name..."></div>
       <select class="filter-select" id="filterSpecialty"><option value="">All Specialties</option></select>
-      <select class="filter-select" id="filterType">
-        <option value="">All Consultation Types</option>
-        <option value="In person">In person</option>
-        <option value="Virtual">Virtual</option>
-      </select>
-      <select class="filter-select" id="filterLocation"><option value="">All Locations</option></select>
-      <select class="filter-select" id="filterRating">
-        <option value="">Any Rating</option>
-        <option value="4.5">4.5+ stars</option>
-        <option value="4">4.0+ stars</option>
-      </select>
     </div>
     <p class="text-muted" id="resultCount"></p>
     <div class="grid grid-4" id="docGrid"></div>
@@ -50,76 +36,37 @@
 <div id="footer-mount"></div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
 <script>
   renderPublicNavbar('doctors');
   renderFooter();
-
-  const specialties = DB.get(DB_KEYS.specialties);
-  const locations = DB.get(DB_KEYS.locations);
-  const specMap = Object.fromEntries(specialties.map(s => [s.id, s.name]));
-  const locMap = Object.fromEntries(locations.map(l => [l.id, l.name]));
-  const allDoctors = DB.get(DB_KEYS.doctors);
-
-  document.getElementById('filterSpecialty').innerHTML += specialties.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-  document.getElementById('filterLocation').innerHTML += locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
-
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('specialty')) document.getElementById('filterSpecialty').value = params.get('specialty');
-
-  function renderDoctors() {
-    const term = document.getElementById('docSearch').value.toLowerCase().trim();
-    const spec = document.getElementById('filterSpecialty').value;
-    const type = document.getElementById('filterType').value;
-    const loc = document.getElementById('filterLocation').value;
-    const rating = parseFloat(document.getElementById('filterRating').value || 0);
-
-    const filtered = allDoctors.filter(d =>
-      (!term || d.name.toLowerCase().includes(term)) &&
-      (!spec || d.specialtyId === spec) &&
-      (!type || d.consultationTypes.includes(type)) &&
-      (!loc || d.locationId === loc) &&
-      (parseFloat(d.rating) >= rating)
-    );
-
-    document.getElementById('resultCount').textContent = `${filtered.length} doctor${filtered.length !== 1 ? 's' : ''} found`;
-    const grid = document.getElementById('docGrid');
-    const empty = document.getElementById('docEmpty');
-    if (filtered.length === 0) {
-      grid.innerHTML = '';
-      emptyState(empty, 'fa-user-doctor', 'No doctors match your filters', 'Try adjusting your search or filters.');
-      return;
-    }
-    empty.innerHTML = '';
-    grid.innerHTML = filtered.map(d => `
-      <div class="card card-hover doctor-card">
-        <img src="${d.photo}" alt="Portrait of ${d.name}" class="doc-photo">
-        <div class="doc-body">
-          <div class="doc-name">${d.name}</div>
-          <div class="doc-spec">${specMap[d.specialtyId]}</div>
-          <div class="doc-meta">
-            <span><i class="fa-solid fa-star rating-stars"></i> ${d.rating}</span>
-            <span><i class="fa-solid fa-briefcase-medical"></i> ${d.experience} yrs</span>
-          </div>
-          <div class="doc-meta">
-            <span><i class="fa-solid fa-location-dot"></i> ${locMap[d.locationId]}</span>
-          </div>
-          <div class="doc-meta">${d.consultationTypes.map(t => `<span class="badge badge-teal">${t}</span>`).join('')}</div>
-          <div class="doc-actions">
-            <a href="doctor-profile.html?id=${d.id}" class="btn btn-outline btn-sm">View Profile</a>
-            <a href="../auth/login.html" class="btn btn-primary btn-sm">Book</a>
-          </div>
-        </div>
-      </div>`).join('');
-  }
-
-  ['docSearch', 'filterSpecialty', 'filterType', 'filterLocation', 'filterRating'].forEach(id => {
-    document.getElementById(id).addEventListener('input', debounce(renderDoctors, 120));
-    document.getElementById(id).addEventListener('change', renderDoctors);
-  });
-  renderDoctors();
+  (async () => {
+    try {
+      const [specs, docs] = await Promise.all([Api.especialidades.list(), Api.medicos.list()]);
+      document.getElementById('filterSpecialty').innerHTML += specs.map(s => `<option value="${s.idEspecialidad}">${esc(s.nombreEspecialidad)}</option>`).join('');
+      const sp = new URLSearchParams(location.search).get('specialty');
+      if (sp) document.getElementById('filterSpecialty').value = sp;
+      function render() {
+        const term = document.getElementById('docSearch').value.toLowerCase().trim(), spec = document.getElementById('filterSpecialty').value;
+        const list = docs.filter(d => (!term || fullName(d).toLowerCase().includes(term)) && (!spec || String(d.idEspecialidad) === spec));
+        document.getElementById('resultCount').textContent = `${list.length} doctor${list.length !== 1 ? 's' : ''} found`;
+        const grid = document.getElementById('docGrid'), empty = document.getElementById('docEmpty');
+        if (!list.length) { grid.innerHTML = ''; emptyState(empty, 'fa-user-doctor', 'No doctors found', 'Try adjusting your search or filters.'); return; }
+        empty.innerHTML = '';
+        grid.innerHTML = list.map(d => `
+          <div class="card card-hover doctor-card"><div class="doc-body" style="text-align:center;">
+            <span class="avatar-lg" style="margin:0 auto 12px;">${initials(fullName(d))}</span>
+            <div class="doc-name">${esc(fullName(d))}</div><div class="doc-spec">${esc(d.especialidad)}</div>
+            <div class="doc-meta" style="justify-content:center;"><span><i class="fa-solid fa-id-card"></i> ${esc(d.numeroColegiatura)}</span></div>
+            <div class="doc-actions"><a href="doctor-profile.html?id=${d.idMedico}" class="btn btn-outline btn-sm">View Profile</a><a href="../auth/login.html" class="btn btn-primary btn-sm">Book</a></div></div></div>`).join('');
+      }
+      ['docSearch', 'filterSpecialty'].forEach(id => { document.getElementById(id).addEventListener('input', debounce(render, 120)); document.getElementById(id).addEventListener('change', render); });
+      render();
+    } catch (e) { fail(e); }
+  })();
 </script>
 </body>
 </html>

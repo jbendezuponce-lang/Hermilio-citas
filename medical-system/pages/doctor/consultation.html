@@ -18,45 +18,32 @@
   <div class="main-content">
     <div id="topbar-mount"></div>
     <div class="content-area">
-      <div class="content-header"><div><h1>Register Consultation</h1><p>Document a clinical visit and update the patient's medical history.</p></div></div>
-
-      <form id="consultForm" class="card" style="max-width:820px;" novalidate>
-        <div class="form-group">
-          <label for="patientSelect">Patient <span class="req">*</span></label>
-          <select id="patientSelect"><option value="">Select a patient...</option></select>
-        </div>
-        <div class="form-group"><label for="reason">Reason for Consultation <span class="req">*</span></label><textarea id="reason" placeholder="e.g. Follow-up on hypertension"></textarea></div>
-        <div class="form-group"><label for="symptoms">Symptoms</label><textarea id="symptoms" placeholder="Describe reported symptoms"></textarea></div>
-
-        <h4 style="margin-top:10px;">Vital Signs</h4>
-        <div class="grid grid-3">
-          <div class="form-group"><label for="weight">Weight</label><input type="text" id="weight" placeholder="e.g. 78 kg"></div>
-          <div class="form-group"><label for="height">Height</label><input type="text" id="height" placeholder="e.g. 176 cm"></div>
-          <div class="form-group"><label for="bp">Blood Pressure</label><input type="text" id="bp" placeholder="e.g. 120/80"></div>
-          <div class="form-group"><label for="temp">Temperature</label><input type="text" id="temp" placeholder="e.g. 36.6°C"></div>
-          <div class="form-group"><label for="hr">Heart Rate</label><input type="text" id="hr" placeholder="e.g. 72 bpm"></div>
-          <div class="form-group"><label for="spo2">Oxygen Saturation</label><input type="text" id="spo2" placeholder="e.g. 98%"></div>
-        </div>
-
-        <div class="form-group"><label for="exam">Clinical Examination</label><textarea id="exam" placeholder="Examination findings"></textarea></div>
-        <div class="form-group"><label for="diagnosis">Diagnosis <span class="req">*</span></label><textarea id="diagnosis" placeholder="Clinical diagnosis"></textarea></div>
-        <div class="form-group"><label for="treatment">Treatment <span class="req">*</span></label><textarea id="treatment" placeholder="Recommended treatment plan"></textarea></div>
-        <div class="form-group"><label for="medications">Medications (one per line)</label><textarea id="medications" placeholder="e.g. Amoxicillin 500mg — 3x daily for 7 days"></textarea></div>
-        <div class="form-group"><label for="recommendations">Recommendations</label><textarea id="recommendations" placeholder="Lifestyle or follow-up recommendations"></textarea></div>
-        <div class="form-group"><label for="notes">Additional Notes</label><textarea id="notes" placeholder="Any additional notes"></textarea></div>
-        <div class="form-group" style="max-width:260px;"><label for="followUp">Next Appointment (optional)</label><input type="date" id="followUp"></div>
-
-        <div class="flex gap-12" style="margin-top:10px;">
-          <button type="button" class="btn btn-ghost" id="saveDraftBtn">Save Draft</button>
-          <button type="submit" class="btn btn-primary">Save Consultation</button>
-          <a href="dashboard.html" class="btn btn-outline">Cancel</a>
-        </div>
-      </form>
+      <div class="content-header">
+        <div><h1 id="pageTitle">Register Consultation</h1><p id="pageSub">Triage, diagnosis, treatment and prescriptions (RF-29, RF-30).</p></div>
+        
+      </div>
+      <div id="pickBox"></div>
+      <div id="consBox" style="display:none;">
+        <div class="alert alert-info" id="consInfo"></div>
+        <div class="card" style="max-width:900px;margin-bottom:22px;"><h4>Triage (optional)</h4>
+          <div class="form-row">
+            <div class="form-group"><label for="tPa">Blood pressure</label><input type="text" id="tPa" placeholder="120/80" maxlength="7"></div>
+            <div class="form-group"><label for="tPeso">Weight (kg)</label><input type="number" id="tPeso" step="0.1" min="0.5" max="500"></div>
+          </div>
+          <div class="form-group"><label for="tSv">Vital signs</label><input type="text" id="tSv" maxlength="255" placeholder="Temp 36.6 °C, HR 72 bpm, SpO2 98%"></div></div>
+        <div class="card" style="max-width:900px;margin-bottom:22px;"><h4>Clinical record</h4>
+          <div class="form-group"><label for="cDx">Diagnosis</label><textarea id="cDx" rows="2"></textarea></div>
+          <div class="form-group"><label for="cTx">Treatment / indications <span class="req">*</span></label><textarea id="cTx" rows="3"></textarea></div>
+          <div class="form-group"><label for="cObs">Observations</label><textarea id="cObs" rows="2"></textarea></div></div>
+        <div class="card" style="max-width:900px;margin-bottom:22px;"><div class="flex justify-between items-center"><h4 style="margin:0;">Prescriptions</h4><button class="btn btn-outline btn-sm" id="addRx" type="button"><i class="fa-solid fa-plus"></i> Add medication</button></div><div id="rxBox" style="margin-top:12px;"></div></div>
+        <button class="btn btn-primary btn-lg" id="saveCons"><i class="fa-solid fa-check"></i> Save and complete consultation</button>
+      </div>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -64,60 +51,44 @@
   const user = Auth.requireRole(['doctor']);
   if (user) {
     renderPortalLayout('consultation.html');
-    document.getElementById('followUp').min = today();
+    (async () => {
+      try {
 
-    const appts = DB.get(DB_KEYS.appointments).filter(a => a.doctorId === user.doctorId);
-    const patientIds = [...new Set(appts.map(a => a.patientId))];
-    const patients = DB.get(DB_KEYS.patients).filter(p => patientIds.includes(p.id));
-    const select = document.getElementById('patientSelect');
-    select.innerHTML += patients.map(p => `<option value="${p.id}">${p.name} (${p.id})</option>`).join('');
+      const sortCitas = (a, b) => (a.fecha + a.horaInicio).localeCompare(b.fecha + b.horaInicio);
 
-    const preselect = new URLSearchParams(window.location.search).get('patient');
-    if (preselect) select.value = preselect;
-
-    document.getElementById('saveDraftBtn').addEventListener('click', () => toast('Draft saved locally.', 'info'));
-
-    document.getElementById('consultForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      const patientId = select.value;
-      const reason = document.getElementById('reason').value.trim();
-      const diagnosis = document.getElementById('diagnosis').value.trim();
-      const treatment = document.getElementById('treatment').value.trim();
-
-      if (!patientId) { toast('Please select a patient.', 'error'); return; }
-      if (!reason) { toast('Please enter a reason for the consultation.', 'error'); return; }
-      if (!diagnosis) { toast('Please enter a diagnosis.', 'error'); return; }
-      if (!treatment) { toast('Please enter a treatment plan.', 'error'); return; }
-
-      const patient = DB.find(DB_KEYS.patients, patientId);
-      const consultation = {
-        id: 'CON-' + Math.floor(600 + Math.random() * 9000),
-        patientId, doctorId: user.doctorId, specialtyId: DB.find(DB_KEYS.doctors, user.doctorId).specialtyId,
-        date: today(), reason, symptoms: document.getElementById('symptoms').value.trim() || 'Not reported',
-        vitals: {
-          weight: document.getElementById('weight').value || '—', height: document.getElementById('height').value || '—',
-          bp: document.getElementById('bp').value || '—', temp: document.getElementById('temp').value || '—',
-          hr: document.getElementById('hr').value || '—', spo2: document.getElementById('spo2').value || '—'
-        },
-        diagnosis, treatment,
-        medications: document.getElementById('medications').value.split('\n').map(m => m.trim()).filter(Boolean),
-        recommendations: document.getElementById('recommendations').value.trim() || 'None',
-        notes: document.getElementById('notes').value.trim() || '—',
-        followUp: document.getElementById('followUp').value || null
-      };
-      DB.insert(DB_KEYS.consultations, consultation);
-
-      // Mark a matching appointment as completed if one exists today
-      const matchingAppt = appts.find(a => a.patientId === patientId && a.date === today() && a.status !== 'Completed' && a.status !== 'Cancelled');
-      if (matchingAppt) DB.update(DB_KEYS.appointments, matchingAppt.id, { status: 'Completed' });
-
-      if (patient.userId) {
-        addNotification(patient.userId, 'Doctor updated medical record', `${user.name} added a new consultation to your medical history.`, 'document');
+      const cid = qparam('cita');
+      if (!cid) {
+        const list = (await Api.citas.miAgenda(today())).filter(c => c.estado === 'CHECK_IN').sort(sortCitas);
+        if (!list.length) { emptyState(qs('#pickBox'), 'fa-notes-medical', 'No patients waiting', 'Patients appear here after the front desk registers their check-in.'); return; }
+        qs('#pickBox').innerHTML = '<h3>Patients waiting</h3>' + list.map(c => `<div class="card" style="margin-bottom:12px;max-width:760px;"><div class="flex items-center justify-between"><div><strong>${esc(c.paciente)}</strong><div class="text-muted" style="font-size:.85rem;">${fmtTime(c.horaInicio)} · ${esc(c.especialidad)} · ${esc(c.documentoPaciente)}</div></div><a class="btn btn-primary" href="consultation.html?cita=${c.idCita}">Start consultation</a></div></div>`).join('');
+        return;
       }
-      addAuditLog(user.name, 'Registered consultation', 'Medical Records');
-      toast('Consultation saved successfully!', 'success');
-      setTimeout(() => window.location.href = 'patient-profile.html?id=' + patientId, 900);
-    });
+      const c = await Api.citas.obtener(cid);
+      if (c.estado !== 'CHECK_IN') { emptyState(qs('#pickBox'), 'fa-ban', 'This appointment is not ready', 'The patient needs a check-in first (current status: ' + estadoLabel(c.estado) + ').'); return; }
+      qs('#consBox').style.display = 'block';
+      qs('#consInfo').innerHTML = `<strong>${esc(c.paciente)}</strong> · Document ${esc(c.documentoPaciente)} · ${formatDate(c.fecha)} ${fmtTime(c.horaInicio)} · ${esc(c.especialidad)}`;
+      let rows = 0;
+      const addRx = () => { rows++; qs('#rxBox').insertAdjacentHTML('beforeend', `<div class="form-row rx-row" style="grid-template-columns:2fr 1fr 2fr auto;align-items:end;margin-bottom:8px;">
+        <div class="form-group" style="margin:0;"><label>Medication</label><input type="text" class="rx-med" maxlength="150"></div><div class="form-group" style="margin:0;"><label>Dose</label><input type="text" class="rx-dose" maxlength="100"></div>
+        <div class="form-group" style="margin:0;"><label>Instructions</label><input type="text" class="rx-ind" maxlength="500"></div><button class="btn btn-danger btn-sm rx-del" type="button" aria-label="Remove"><i class="fa-solid fa-trash"></i></button></div>`); };
+      qs('#addRx').addEventListener('click', addRx);
+      qs('#rxBox').addEventListener('click', (e) => { const b = e.target.closest('.rx-del'); if (b) b.closest('.rx-row').remove(); });
+      qs('#saveCons').addEventListener('click', async () => {
+        const v = id => document.getElementById(id).value.trim();
+        if (!v('cTx')) { toast('Treatment / indications are required.', 'error'); return; }
+        if (v('tPa') && !/^\d{2,3}\/\d{2,3}$/.test(v('tPa'))) { toast('Blood pressure must look like 120/80.', 'error'); return; }
+        const recetas = [...document.querySelectorAll('.rx-row')].map(r => ({ medicamento: r.querySelector('.rx-med').value.trim(), dosis: r.querySelector('.rx-dose').value.trim(), indicaciones: r.querySelector('.rx-ind').value.trim() || null })).filter(r => r.medicamento || r.dosis);
+        if (recetas.some(r => !r.medicamento || !r.dosis)) { toast('Each prescription needs a medication and a dose.', 'error'); return; }
+        const btn = qs('#saveCons'); btn.disabled = true;
+        try {
+          if (v('tPa') || v('tPeso') || v('tSv')) { try { await Api.triajes.registrar({ idCita: c.idCita, presionArterial: v('tPa') || null, peso: v('tPeso') ? Number(v('tPeso')) : null, signosVitales: v('tSv') || null }); } catch (e) { if (e.status !== 409) throw e; } }
+          await Api.historiales.registrar({ idCita: c.idCita, diagnostico: v('cDx') || null, tratamiento: v('cTx'), observaciones: v('cObs') || null, recetas });
+          await Api.citas.atender(c.idCita);
+          toast('Consultation saved and appointment completed.', 'success'); setTimeout(() => location.href = 'agenda.html', 1200);
+        } catch (e) { fail(e); btn.disabled = false; }
+      });
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

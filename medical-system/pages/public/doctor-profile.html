@@ -29,79 +29,30 @@
 <div id="footer-mount"></div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
 <script>
   renderPublicNavbar('doctors');
   renderFooter();
-
-  const id = new URLSearchParams(window.location.search).get('id');
-  const doctor = DB.find(DB_KEYS.doctors, id);
-  const wrap = document.getElementById('profileWrap');
-
-  if (!doctor) {
-    wrap.innerHTML = '';
-    emptyState(wrap, 'fa-user-doctor', 'Doctor not found', 'This profile may have been removed.');
-  } else {
-    document.getElementById('crumbName').textContent = doctor.name;
-    const spec = DB.find(DB_KEYS.specialties, doctor.specialtyId);
-    const loc = DB.find(DB_KEYS.locations, doctor.locationId);
-
-    wrap.innerHTML = `
-      <div>
-        <div class="card" style="text-align:center;padding:30px;">
-          <img src="${doctor.photo}" alt="Portrait of ${doctor.name}" class="avatar-lg" style="margin:0 auto 16px;width:140px;height:140px;">
-          <h2 style="margin-bottom:2px;">${doctor.name}</h2>
-          <div class="doc-spec" style="font-size:1rem;">${spec ? spec.name : ''}</div>
-          <div class="flex gap-12" style="justify-content:center;margin:14px 0;">
-            <span><i class="fa-solid fa-star rating-stars"></i> ${doctor.rating} rating</span>
-            <span><i class="fa-solid fa-briefcase-medical"></i> ${doctor.experience} yrs experience</span>
-          </div>
-          <div class="flex gap-8" style="justify-content:center;flex-wrap:wrap;margin-bottom:18px;">
-            ${doctor.consultationTypes.map(t => `<span class="badge badge-teal">${t}</span>`).join('')}
-          </div>
-          <a href="../auth/login.html" class="btn btn-primary btn-block"><i class="fa-solid fa-calendar-plus"></i> Book Appointment</a>
-        </div>
-
-        <div class="card" style="margin-top:20px;">
-          <h4>Contact & Location</h4>
-          <p><i class="fa-solid fa-location-dot"></i> ${loc ? loc.name + ', ' + loc.address : '—'}</p>
-          <p><i class="fa-solid fa-phone"></i> ${doctor.phone}</p>
-          <p><i class="fa-solid fa-envelope"></i> ${doctor.email}</p>
-        </div>
-      </div>
-
-      <div>
-        <div class="card" style="margin-bottom:20px;">
-          <h4>About</h4>
-          <p>${doctor.bio}</p>
-        </div>
-        <div class="card" style="margin-bottom:20px;">
-          <h4>Education & Certifications</h4>
-          <p><i class="fa-solid fa-graduation-cap"></i> ${doctor.education}</p>
-          <div class="flex gap-8" style="flex-wrap:wrap;">
-            ${doctor.certifications.map(c => `<span class="badge badge-gray">${c}</span>`).join('')}
-          </div>
-        </div>
-        <div class="card" style="margin-bottom:20px;">
-          <h4>Working Schedule</h4>
-          <div class="table-wrap" style="border:none;">
-            <table class="data-table">
-              <thead><tr><th>Day</th><th>Hours</th></tr></thead>
-              <tbody>${doctor.schedule.map(s => `<tr><td>${s.day}</td><td>${s.from} - ${s.to}</td></tr>`).join('')}</tbody>
-            </table>
-          </div>
-        </div>
-        <div class="card">
-          <h4>Next Available Slots</h4>
-          <div class="slot-grid">
-            ${['09:00', '09:30', '10:00', '11:00', '14:00', '15:30'].map(t => `<div class="slot-btn" style="cursor:default;">${t}</div>`).join('')}
-          </div>
-          <p class="form-hint" style="margin-top:12px;">Sign in to book one of these times, or select a different date after logging in.</p>
-        </div>
-      </div>`;
-  }
+  (async () => {
+    const wrap = document.getElementById('profileWrap');
+    try {
+      const id = new URLSearchParams(location.search).get('id');
+      const doctor = (await Api.medicos.list()).find(d => String(d.idMedico) === String(id));
+      if (!doctor) { wrap.innerHTML = ''; emptyState(wrap, 'fa-user-doctor', 'Doctor not found', 'This profile may have been removed or the doctor is inactive.'); return; }
+      document.getElementById('crumbName').textContent = fullName(doctor);
+      wrap.innerHTML = `
+        <div><div class="card" style="text-align:center;padding:30px;">
+          <span class="avatar-lg" style="margin:0 auto 16px;width:120px;height:120px;font-size:2.2rem;">${initials(fullName(doctor))}</span>
+          <h2 style="margin-bottom:2px;">${esc(fullName(doctor))}</h2><div class="doc-spec" style="font-size:1rem;">${esc(doctor.especialidad)}</div>
+          <div class="flex gap-12" style="justify-content:center;margin:14px 0 18px;"><span><i class="fa-solid fa-id-card"></i> License ${esc(doctor.numeroColegiatura)}</span></div>
+          <a href="../auth/login.html" class="btn btn-primary btn-block"><i class="fa-solid fa-calendar-plus"></i> Sign in to book</a></div></div>
+        <div><div class="card"><h4>About</h4><p>${esc(fullName(doctor))} attends outpatient consultations in <strong>${esc(doctor.especialidad)}</strong> at Hospital Hermilio Valdizán.</p>
+          <p class="text-muted">Available time slots are shown when you sign in and start booking an appointment.</p></div></div>`;
+    } catch (e) { wrap.innerHTML = ''; fail(e); }
+  })();
 </script>
 </body>
 </html>

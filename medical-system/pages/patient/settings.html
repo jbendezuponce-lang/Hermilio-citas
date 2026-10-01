@@ -18,41 +18,26 @@
   <div class="main-content">
     <div id="topbar-mount"></div>
     <div class="content-area">
-      <div class="content-header"><div><h1>Settings</h1><p>Manage your account preferences and security.</p></div></div>
-
-      <div class="card" style="max-width:640px;margin-bottom:22px;">
-        <h4>Change Password</h4>
-        <form id="pwForm" novalidate>
-          <div class="form-group"><label for="currentPw">Current Password</label><input type="password" id="currentPw"></div>
-          <div class="form-group"><label for="newPw">New Password</label><input type="password" id="newPw"></div>
-          <div class="form-group"><label for="confirmPw">Confirm New Password</label><input type="password" id="confirmPw"></div>
-          <button type="submit" class="btn btn-primary">Update Password</button>
-        </form>
+      <div class="content-header">
+        <div><h1 id="pageTitle">Settings</h1><p id="pageSub">Account and security.</p></div>
+        
       </div>
-
-      <div class="card" style="max-width:640px;margin-bottom:22px;">
-        <h4>Notification Preferences</h4>
-        <div class="checkbox-row" style="margin-bottom:14px;"><input type="checkbox" id="emailNotif" checked><label for="emailNotif">Email notifications</label></div>
-        <div class="checkbox-row" style="margin-bottom:14px;"><input type="checkbox" id="reminderNotif" checked><label for="reminderNotif">Appointment reminders</label></div>
-        <div class="checkbox-row"><input type="checkbox" id="smsNotif"><label for="smsNotif">SMS notifications</label></div>
-      </div>
-
-      <div class="card" style="max-width:640px;margin-bottom:22px;">
-        <h4>Privacy Settings</h4>
-        <div class="checkbox-row" style="margin-bottom:14px;"><input type="checkbox" id="shareData" checked><label for="shareData">Allow doctors to view my full medical history</label></div>
-        <div class="checkbox-row"><input type="checkbox" id="marketing"><label for="marketing">Receive marketing communications</label></div>
-      </div>
-
-      <div class="card" style="max-width:640px;">
-        <h4>Session Settings</h4>
-        <p>You are currently logged in on this device.</p>
-        <button class="btn btn-outline" id="logoutAllBtn"><i class="fa-solid fa-right-from-bracket"></i> Log out of all devices</button>
+      <div class="card" style="max-width:760px;">
+        <h4>Account</h4>
+        <table class="data-table" style="min-width:0;"><tbody id="accBody"></tbody></table>
+        <h4 style="margin-top:24px;">Security</h4>
+        <p class="text-muted">To change your password, request a recovery link. For your safety, close your session when using a shared computer.</p>
+        <div class="flex gap-12" style="flex-wrap:wrap;">
+          <a href="../auth/forgot-password.html" class="btn btn-outline"><i class="fa-solid fa-key"></i> Reset password</a>
+          <button class="btn btn-danger" id="outBtn"><i class="fa-solid fa-right-from-bracket"></i> Sign out</button>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -60,29 +45,16 @@
   const user = Auth.requireRole(['patient']);
   if (user) {
     renderPortalLayout('settings.html');
+    (async () => {
+      try {
 
-    document.getElementById('pwForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      const current = document.getElementById('currentPw').value;
-      const next = document.getElementById('newPw').value;
-      const confirm = document.getElementById('confirmPw').value;
-      const dbUser = DB.find(DB_KEYS.users, user.id);
-      if (current !== dbUser.password) { toast('Current password is incorrect.', 'error'); return; }
-      if (passwordStrength(next) < 2) { toast('New password is too weak.', 'error'); return; }
-      if (next !== confirm) { toast('Passwords do not match.', 'error'); return; }
-      DB.update(DB_KEYS.users, user.id, { password: next });
-      toast('Password updated successfully!', 'success');
-      e.target.reset();
-    });
-
-    qsa('.checkbox-row input').forEach(cb => cb.addEventListener('change', () => toast('Preference saved.', 'success', 1500)));
-
-    document.getElementById('logoutAllBtn').addEventListener('click', () => {
-      confirmDialog('This will log you out of all devices. Continue?', () => {
-        Auth.logout();
-        window.location.href = '../../index.html';
-      });
-    });
+      const p = await Api.pacientes.me();
+      qs('#accBody').innerHTML = `<tr><td style="font-weight:600;width:160px;">Name</td><td>${esc(fullName(p))}</td></tr>
+        <tr><td style="font-weight:600;">Email</td><td>${esc(p.correo)}</td></tr><tr><td style="font-weight:600;">Document ID</td><td>${esc(p.documentoIdentidad)}</td></tr>
+        <tr><td style="font-weight:600;">Role</td><td>${rolBadge('PACIENTE')}</td></tr>`;
+      qs('#outBtn').addEventListener('click', () => Auth.logout());
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

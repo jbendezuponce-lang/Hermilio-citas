@@ -19,23 +19,25 @@
   <div class="main-content">
     <div id="topbar-mount"></div>
     <div class="content-area">
-      <div class="content-header"><div><h1 id="welcomeMsg">Welcome back!</h1><p>System-wide overview and analytics.</p></div></div>
-
+      <div class="content-header">
+        <div><h1 id="pageTitle">Welcome back!</h1><p id="pageSub">System-wide overview and analytics.</p></div>
+        
+      </div>
       <div class="dashboard-grid" id="statsGrid"></div>
-
       <div class="two-col">
         <div class="card"><h4>Appointments by Month</h4><canvas id="monthChart" height="220"></canvas></div>
         <div class="card"><h4>Appointments by Specialty</h4><canvas id="specChart" height="220"></canvas></div>
       </div>
       <div class="two-col" style="margin-top:22px;">
-        <div class="card"><h4>New Patients (last 6 months)</h4><canvas id="patientsChart" height="220"></canvas></div>
-        <div class="card"><h4>Consultation Statistics</h4><canvas id="statusChart" height="220"></canvas></div>
+        <div class="card"><h4>Users by Role</h4><canvas id="roleChart" height="220"></canvas></div>
+        <div class="card"><h4>Appointment Status (last 6 months)</h4><canvas id="statusChart" height="220"></canvas></div>
       </div>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -43,68 +45,53 @@
   const user = Auth.requireRole(['admin']);
   if (user) {
     renderPortalLayout('dashboard.html');
-    document.getElementById('welcomeMsg').textContent = 'Welcome back, ' + user.name.split(' ')[0] + '!';
+    (async () => {
+      try {
 
-    const patients = DB.get(DB_KEYS.patients);
-    const doctors = DB.get(DB_KEYS.doctors);
-    const users = DB.get(DB_KEYS.users);
-    const appts = DB.get(DB_KEYS.appointments);
-    const specialties = DB.get(DB_KEYS.specialties);
-    const specMap = Object.fromEntries(specialties.map(s => [s.id, s.name]));
-
-    const todayAppts = appts.filter(a => a.date === today());
-    const monthAppts = appts.filter(a => a.date.slice(0, 7) === today().slice(0, 7));
-    const cancelled = appts.filter(a => a.status === 'Cancelled');
-    const completed = appts.filter(a => a.status === 'Completed');
-
-    document.getElementById('statsGrid').innerHTML = `
-      <div class="card stat-card"><div class="stat-icon blue"><i class="fa-solid fa-users"></i></div><div><div class="stat-value">${patients.length}</div><div class="stat-label">Total Patients</div></div></div>
-      <div class="card stat-card"><div class="stat-icon teal"><i class="fa-solid fa-user-doctor"></i></div><div><div class="stat-value">${doctors.length}</div><div class="stat-label">Total Doctors</div></div></div>
-      <div class="card stat-card"><div class="stat-icon purple"><i class="fa-solid fa-user-gear"></i></div><div><div class="stat-value">${users.length}</div><div class="stat-label">Total Users</div></div></div>
-      <div class="card stat-card"><div class="stat-icon amber"><i class="fa-solid fa-calendar-day"></i></div><div><div class="stat-value">${todayAppts.length}</div><div class="stat-label">Today's Appointments</div></div></div>
-      <div class="card stat-card"><div class="stat-icon green"><i class="fa-solid fa-calendar-check"></i></div><div><div class="stat-value">${monthAppts.length}</div><div class="stat-label">Monthly Appointments</div></div></div>
-      <div class="card stat-card"><div class="stat-icon red"><i class="fa-solid fa-calendar-xmark"></i></div><div><div class="stat-value">${cancelled.length}</div><div class="stat-label">Cancelled Appointments</div></div></div>
-      <div class="card stat-card"><div class="stat-icon blue"><i class="fa-solid fa-circle-check"></i></div><div><div class="stat-value">${completed.length}</div><div class="stat-label">Completed Consultations</div></div></div>`;
-
-    const chartColors = ['#0f7c8c', '#2563eb', '#14b8a6', '#d97706', '#dc2626', '#7c3aed', '#16a34a'];
-
-    // Appointments by month (last 6 months)
-    const months = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(); d.setMonth(d.getMonth() - i);
-      months.push(d.toISOString().slice(0, 7));
-    }
-    const monthCounts = months.map(m => appts.filter(a => a.date.slice(0, 7) === m).length);
-    new Chart(document.getElementById('monthChart'), {
-      type: 'bar',
-      data: { labels: months.map(m => new Date(m + '-01').toLocaleDateString('en-US', { month: 'short' })), datasets: [{ label: 'Appointments', data: monthCounts, backgroundColor: '#0f7c8c', borderRadius: 6 }] },
-      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-    });
-
-    // By specialty
-    const specCounts = specialties.map(s => appts.filter(a => a.specialtyId === s.id).length);
-    new Chart(document.getElementById('specChart'), {
-      type: 'doughnut',
-      data: { labels: specialties.map(s => s.name), datasets: [{ data: specCounts, backgroundColor: chartColors.concat(['#64767d', '#f59e0b', '#0ea5e9']) }] },
-      options: { plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 10 } } } } }
-    });
-
-    // New patients last 6 months
-    const patientCounts = months.map(m => patients.filter(p => p.registered && p.registered.slice(0, 7) === m).length);
-    new Chart(document.getElementById('patientsChart'), {
-      type: 'line',
-      data: { labels: months.map(m => new Date(m + '-01').toLocaleDateString('en-US', { month: 'short' })), datasets: [{ label: 'New Patients', data: patientCounts, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.1)', fill: true, tension: .35 }] },
-      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-    });
-
-    // Status distribution
-    const statuses = ['Confirmed', 'Pending', 'Completed', 'Cancelled'];
-    const statusCounts = statuses.map(s => appts.filter(a => a.status === s).length);
-    new Chart(document.getElementById('statusChart'), {
-      type: 'pie',
-      data: { labels: statuses, datasets: [{ data: statusCounts, backgroundColor: ['#2563eb', '#d97706', '#16a34a', '#dc2626'] }] },
-      options: { plugins: { legend: { position: 'right' } } }
-    });
+      qs('#pageTitle').textContent = 'Welcome back, ' + user.name.split(' ')[0] + '!';
+      qs('#pageSub').textContent = 'System-wide overview and analytics (live data from the database).';
+      const monthRange = (off) => {
+        const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + off);
+        const y = d.getFullYear(), m = d.getMonth();
+        return { start: isoDate(new Date(y, m, 1)), end: isoDate(new Date(y, m + 1, 0)), label: new Date(y, m, 1).toLocaleDateString('en-US', { month: 'short' }) };
+      };
+      const months = [-5, -4, -3, -2, -1, 0].map(monthRange);
+      const rangeStart = months[0].start, rangeEnd = months[5].end;
+      const [users, perMonth, total, hoy, bySpec] = await Promise.all([
+        Api.usuarios.list(),
+        Promise.all(months.map(m => Api.reportes.citas(m.start, m.end))),
+        Api.reportes.citas(rangeStart, rangeEnd),
+        Api.reportes.citas(today(), today()),
+        Api.reportes.inasistencia(rangeStart, rangeEnd)
+      ]);
+      const count = r => users.filter(u => u.rol === r).length;
+      const card = (icon, color, val, label) => `<div class="card stat-card"><div class="stat-icon ${color}"><i class="fa-solid ${icon}"></i></div><div><div class="stat-value">${val}</div><div class="stat-label">${label}</div></div></div>`;
+      qs('#statsGrid').innerHTML =
+        card('fa-users', 'blue', count('PACIENTE'), 'Total Patients') +
+        card('fa-user-doctor', 'teal', count('MEDICO'), 'Total Doctors') +
+        card('fa-user-gear', 'purple', users.length, 'Total Users') +
+        card('fa-calendar-day', 'amber', hoy.total, "Today's Appointments") +
+        card('fa-calendar-check', 'green', perMonth[5].total, 'Appointments This Month') +
+        card('fa-calendar-xmark', 'red', total.canceladas, 'Cancelled (6 months)') +
+        card('fa-circle-check', 'blue', total.atendidas, 'Completed (6 months)');
+      const colors = ['#0f7c8c', '#2563eb', '#14b8a6', '#d97706', '#dc2626', '#7c3aed', '#16a34a'];
+      new Chart(qs('#monthChart'), { type: 'bar',
+        data: { labels: months.map(m => m.label), datasets: [{ label: 'Appointments', data: perMonth.map(r => r.total), backgroundColor: '#0f7c8c', borderRadius: 6 }] },
+        options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } } });
+      const filas = bySpec.filas || [];
+      new Chart(qs('#specChart'), { type: 'doughnut',
+        data: { labels: filas.length ? filas.map(f => f.especialidad) : ['No data'], datasets: [{ data: filas.length ? filas.map(f => f.citasConsideradas) : [1], backgroundColor: filas.length ? colors : ['#cbd5e1'] }] },
+        options: { plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 10 } } } } } });
+      const roles = ['PACIENTE', 'MEDICO', 'RECEPCIONISTA', 'ADMINISTRADOR'];
+      new Chart(qs('#roleChart'), { type: 'pie',
+        data: { labels: roles.map(r => ROL_LABEL[r]), datasets: [{ data: roles.map(count), backgroundColor: colors }] },
+        options: { plugins: { legend: { position: 'right' } } } });
+      const st = [['Confirmed/Active', total.total - total.atendidas - total.canceladas - total.noAsistio], ['Completed', total.atendidas], ['Cancelled', total.canceladas], ['No-show', total.noAsistio]];
+      new Chart(qs('#statusChart'), { type: 'pie',
+        data: { labels: st.map(x => x[0]), datasets: [{ data: st.map(x => Math.max(0, x[1])), backgroundColor: ['#2563eb', '#16a34a', '#dc2626', '#64767d'] }] },
+        options: { plugins: { legend: { position: 'right' } } } });
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>

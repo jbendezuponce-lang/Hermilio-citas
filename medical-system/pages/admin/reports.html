@@ -19,32 +19,30 @@
   <div class="main-content">
     <div id="topbar-mount"></div>
     <div class="content-area">
-      <div class="content-header"><div><h1>Reports</h1><p>Analyze appointment and patient trends.</p></div></div>
-
+      <div class="content-header">
+        <div><h1 id="pageTitle">Reports</h1><p id="pageSub">Appointments and absenteeism for any period (RF-32, RF-33).</p></div>
+        
+      </div>
       <div class="toolbar">
-        <input type="date" id="fromDate" class="filter-select">
-        <input type="date" id="toDate" class="filter-select">
-        <select class="filter-select" id="fDoctor"><option value="">All Doctors</option></select>
-        <select class="filter-select" id="fSpecialty"><option value="">All Specialties</option></select>
-        <select class="filter-select" id="fStatus"><option value="">All Statuses</option><option>Confirmed</option><option>Pending</option><option>Completed</option><option>Cancelled</option></select>
-        <button class="btn btn-primary" id="applyBtn">Apply Filters</button>
+        <div class="form-group" style="margin:0;"><label for="rFrom" style="font-size:.8rem;">From</label><input type="date" id="rFrom"></div>
+        <div class="form-group" style="margin:0;"><label for="rTo" style="font-size:.8rem;">To</label><input type="date" id="rTo"></div>
+        <select class="filter-select" id="rSpec"><option value="">All specialties</option></select>
+        <button class="btn btn-primary" id="rGo"><i class="fa-solid fa-chart-column"></i> Generate</button>
+        <button class="btn btn-outline" id="rCsv"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
       </div>
-
-      <div class="dashboard-grid" id="summaryGrid"></div>
-
+      <div class="dashboard-grid" id="rStats"></div>
       <div class="two-col">
-        <div class="card"><h4>Appointments per Month</h4><canvas id="c1" height="220"></canvas></div>
-        <div class="card"><h4>Appointments by Specialty</h4><canvas id="c2" height="220"></canvas></div>
-      </div>
-      <div class="two-col" style="margin-top:22px;">
-        <div class="card"><h4>Appointments by Doctor</h4><canvas id="c3" height="220"></canvas></div>
-        <div class="card"><h4>Appointment Status Breakdown</h4><canvas id="c4" height="220"></canvas></div>
+        <div class="card"><h4>Appointments by Status</h4><canvas id="rChart" height="220"></canvas></div>
+        <div class="card"><h4>Absenteeism by Specialty</h4>
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>Specialty</th><th>Appointments</th><th>No-shows</th><th>%</th></tr></thead><tbody id="rBody"></tbody></table></div>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
 <script src="../../js/data.js"></script>
+<script src="../../js/api.js"></script>
 <script src="../../js/auth.js"></script>
 <script src="../../js/utils.js"></script>
 <script src="../../js/navigation.js"></script>
@@ -52,73 +50,40 @@
   const user = Auth.requireRole(['admin']);
   if (user) {
     renderPortalLayout('reports.html');
-    const doctors = DB.get(DB_KEYS.doctors);
-    const specialties = DB.get(DB_KEYS.specialties);
-    const specMap = Object.fromEntries(specialties.map(s => [s.id, s.name]));
-    const docMap = Object.fromEntries(doctors.map(d => [d.id, d.name]));
+    (async () => {
+      try {
 
-    document.getElementById('fDoctor').innerHTML += doctors.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-    document.getElementById('fSpecialty').innerHTML += specialties.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-
-    let charts = [];
-    function destroyCharts() { charts.forEach(c => c.destroy()); charts = []; }
-
-    function renderReports() {
-      destroyCharts();
-      const from = document.getElementById('fromDate').value;
-      const to = document.getElementById('toDate').value;
-      const doctorId = document.getElementById('fDoctor').value;
-      const specialtyId = document.getElementById('fSpecialty').value;
-      const status = document.getElementById('fStatus').value;
-
-      const appts = DB.get(DB_KEYS.appointments)
-        .filter(a => !from || a.date >= from)
-        .filter(a => !to || a.date <= to)
-        .filter(a => !doctorId || a.doctorId === doctorId)
-        .filter(a => !specialtyId || a.specialtyId === specialtyId)
-        .filter(a => !status || a.status === status);
-
-      const newPatients = DB.get(DB_KEYS.patients).filter(p => (!from || p.registered >= from) && (!to || p.registered <= to));
-      const cancelled = appts.filter(a => a.status === 'Cancelled');
-      const completed = appts.filter(a => a.status === 'Completed');
-
-      document.getElementById('summaryGrid').innerHTML = `
-        <div class="card stat-card"><div class="stat-icon blue"><i class="fa-solid fa-calendar-check"></i></div><div><div class="stat-value">${appts.length}</div><div class="stat-label">Total Appointments</div></div></div>
-        <div class="card stat-card"><div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div><div><div class="stat-value">${completed.length}</div><div class="stat-label">Completed</div></div></div>
-        <div class="card stat-card"><div class="stat-icon red"><i class="fa-solid fa-calendar-xmark"></i></div><div><div class="stat-value">${cancelled.length}</div><div class="stat-label">Cancelled</div></div></div>
-        <div class="card stat-card"><div class="stat-icon teal"><i class="fa-solid fa-user-plus"></i></div><div><div class="stat-value">${newPatients.length}</div><div class="stat-label">New Patients</div></div></div>`;
-
-      const months = [...new Set(appts.map(a => a.date.slice(0, 7)))].sort();
-      charts.push(new Chart(document.getElementById('c1'), {
-        type: 'bar',
-        data: { labels: months.map(m => new Date(m + '-01').toLocaleDateString('en-US', { month: 'short', year: '2-digit' })), datasets: [{ label: 'Appointments', data: months.map(m => appts.filter(a => a.date.slice(0, 7) === m).length), backgroundColor: '#0f7c8c', borderRadius: 6 }] },
-        options: { plugins: { legend: { display: false } } }
-      }));
-
-      const specIds = [...new Set(appts.map(a => a.specialtyId))];
-      charts.push(new Chart(document.getElementById('c2'), {
-        type: 'doughnut',
-        data: { labels: specIds.map(id => specMap[id]), datasets: [{ data: specIds.map(id => appts.filter(a => a.specialtyId === id).length), backgroundColor: ['#0f7c8c', '#2563eb', '#14b8a6', '#d97706', '#dc2626', '#7c3aed', '#16a34a', '#64767d', '#f59e0b', '#0ea5e9'] }] },
-        options: { plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } } } }
-      }));
-
-      const docIds = [...new Set(appts.map(a => a.doctorId))].slice(0, 8);
-      charts.push(new Chart(document.getElementById('c3'), {
-        type: 'bar',
-        data: { labels: docIds.map(id => docMap[id]), datasets: [{ label: 'Appointments', data: docIds.map(id => appts.filter(a => a.doctorId === id).length), backgroundColor: '#2563eb', borderRadius: 6 }] },
-        options: { indexAxis: 'y', plugins: { legend: { display: false } } }
-      }));
-
-      const statuses = ['Confirmed', 'Pending', 'Completed', 'Cancelled'];
-      charts.push(new Chart(document.getElementById('c4'), {
-        type: 'pie',
-        data: { labels: statuses, datasets: [{ data: statuses.map(s => appts.filter(a => a.status === s).length), backgroundColor: ['#2563eb', '#d97706', '#16a34a', '#dc2626'] }] },
-        options: { plugins: { legend: { position: 'right' } } }
-      }));
-    }
-
-    document.getElementById('applyBtn').addEventListener('click', renderReports);
-    renderReports();
+      const val = id => document.getElementById(id).value;
+      const specs = await Api.especialidades.list();
+      qs('#rSpec').innerHTML = '<option value="">All specialties</option>' + specs.map(s => `<option value="${s.idEspecialidad}">${esc(s.nombreEspecialidad)}</option>`).join('');
+      const d = new Date(); qs('#rFrom').value = isoDate(new Date(d.getFullYear(), d.getMonth(), 1)); qs('#rTo').value = isoDate(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+      let chart, last = null;
+      async function generate() {
+        if (!val('rFrom') || !val('rTo') || val('rFrom') > val('rTo')) { toast('Check the date range.', 'error'); return; }
+        const [rc, ri] = await Promise.all([Api.reportes.citas(val('rFrom'), val('rTo')), Api.reportes.inasistencia(val('rFrom'), val('rTo'), val('rSpec'))]);
+        last = { rc, ri };
+        const card = (icon, color, v, l) => `<div class="card stat-card"><div class="stat-icon ${color}"><i class="fa-solid ${icon}"></i></div><div><div class="stat-value">${v}</div><div class="stat-label">${l}</div></div></div>`;
+        qs('#rStats').innerHTML = card('fa-calendar', 'blue', rc.total, 'Total') + card('fa-circle-check', 'green', rc.atendidas, 'Completed') +
+          card('fa-calendar-xmark', 'red', rc.canceladas, 'Cancelled') + card('fa-rotate', 'purple', rc.reprogramadas, 'Rescheduled') + card('fa-user-slash', 'amber', rc.noAsistio, 'No-shows');
+        if (chart) chart.destroy();
+        chart = new Chart(qs('#rChart'), { type: 'bar',
+          data: { labels: ['Completed', 'Cancelled', 'Rescheduled', 'No-show'], datasets: [{ data: [rc.atendidas, rc.canceladas, rc.reprogramadas, rc.noAsistio], backgroundColor: ['#16a34a', '#dc2626', '#7c3aed', '#64767d'], borderRadius: 6 }] },
+          options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } } });
+        const filas = ri.filas || [];
+        qs('#rBody').innerHTML = filas.length ? filas.map(f => `<tr><td>${esc(f.especialidad)}</td><td>${f.citasConsideradas}</td><td>${f.inasistencias}</td><td>${Number(f.porcentaje).toFixed(1)} %</td></tr>`).join('')
+          : '<tr><td colspan="4" class="text-muted">No data for this range.</td></tr>';
+      }
+      qs('#rGo').addEventListener('click', () => safe(generate));
+      qs('#rCsv').addEventListener('click', () => {
+        if (!last) { toast('Generate the report first.', 'info'); return; }
+        const { rc, ri } = last;
+        const rows = [['Report', 'From', 'To'], ['Appointments', rc.desde, rc.hasta], [], ['Status', 'Count'], ['Total', rc.total], ['Completed', rc.atendidas], ['Cancelled', rc.canceladas], ['Rescheduled', rc.reprogramadas], ['No-show', rc.noAsistio], [],
+          ['Specialty', 'Appointments considered', 'No-shows', 'Percentage'], ...(ri.filas || []).map(f => [f.especialidad, f.citasConsideradas, f.inasistencias, Number(f.porcentaje).toFixed(1)])];
+        downloadFile(`report_${rc.desde}_${rc.hasta}.csv`, toCsv(rows));
+      });
+      await generate();
+      } catch (e) { fail(e); }
+    })();
   }
 </script>
 </body>
