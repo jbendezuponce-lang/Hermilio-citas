@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Appointments | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/dashboard.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div id="topbar-mount"></div>
+    <div class="content-area">
+      <div class="content-header">
+        <div><h1>My Appointments</h1><p>Manage your upcoming and past visits.</p></div>
+        <a href="book-appointment.html" class="btn btn-primary"><i class="fa-solid fa-calendar-plus"></i> Book Appointment</a>
+      </div>
+
+      <div class="tabs" id="apptTabs">
+        <button class="tab-btn active" data-tab="Confirmed">Upcoming</button>
+        <button class="tab-btn" data-tab="Pending">Pending</button>
+        <button class="tab-btn" data-tab="Completed">Completed</button>
+        <button class="tab-btn" data-tab="Cancelled">Cancelled</button>
+      </div>
+
+      <div id="apptListWrap" style="margin-top:20px;"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  const user = Auth.requireRole(['patient']);
+  if (user) {
+    renderPortalLayout('appointments.html');
+    const doctors = Object.fromEntries(DB.get(DB_KEYS.doctors).map(d => [d.id, d]));
+    const specMap = Object.fromEntries(DB.get(DB_KEYS.specialties).map(s => [s.id, s.name]));
+    const locMap = Object.fromEntries(DB.get(DB_KEYS.locations).map(l => [l.id, l.name]));
+    let activeTab = 'Confirmed';
+
+    function render() {
+      const appts = DB.get(DB_KEYS.appointments)
+        .filter(a => a.patientId === user.patientId && a.status === activeTab)
+        .sort((a, b) => activeTab === 'Completed' || activeTab === 'Cancelled' ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date));
+
+      const wrap = document.getElementById('apptListWrap');
+      if (appts.length === 0) {
+        wrap.innerHTML = '';
+        emptyState(wrap, 'fa-calendar-xmark', `No ${activeTab.toLowerCase()} appointments`, 'There is nothing to show in this category yet.');
+        return;
+      }
+      wrap.innerHTML = `<div class="table-wrap"><table class="data-table">
+        <thead><tr><th>Doctor</th><th>Specialty</th><th>Date</th><th>Time</th><th>Type</th><th>Location</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>${appts.map(a => {
+          const doc = doctors[a.doctorId];
+          return `<tr>
+            <td><div class="flex items-center gap-12"><img src="${doc.photo}" class="avatar" style="width:34px;height:34px;" alt=""><span>${doc.name}</span></div></td>
+            <td>${specMap[a.specialtyId]}</td>
+            <td>${formatDate(a.date)}</td>
+            <td>${a.time}</td>
+            <td>${a.type}</td>
+            <td>${locMap[a.locationId]}</td>
+            <td>${statusBadge(a.status)}</td>
+            <td class="table-actions">
+              <a href="appointment-details.html?id=${a.id}" class="btn btn-outline btn-sm" data-tooltip="View details"><i class="fa-solid fa-eye"></i></a>
+              ${(a.status === 'Confirmed' || a.status === 'Pending') ? `
+                <a href="reschedule.html?id=${a.id}" class="btn btn-outline btn-sm" data-tooltip="Reschedule"><i class="fa-solid fa-calendar-days"></i></a>
+                <button class="btn btn-danger btn-sm cancel-btn" data-id="${a.id}" data-tooltip="Cancel"><i class="fa-solid fa-xmark"></i></button>` : ''}
+            </td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>`;
+
+      qsa('.cancel-btn').forEach(btn => btn.addEventListener('click', () => {
+        confirmDialog('Are you sure you want to cancel this appointment? This action cannot be undone.', () => {
+          DB.update(DB_KEYS.appointments, btn.dataset.id, { status: 'Cancelled' });
+          addNotification(user.id, 'Appointment cancelled', 'Your appointment has been cancelled successfully.', 'appointment');
+          addAuditLog(user.name, 'Cancelled appointment', 'Appointments');
+          toast('Appointment cancelled.', 'success');
+          render();
+        }, { danger: true, confirmText: 'Cancel Appointment' });
+      }));
+    }
+
+    qsa('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
+      qsa('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeTab = btn.dataset.tab;
+      render();
+    }));
+
+    render();
+  }
+</script>
+</body>
+</html>

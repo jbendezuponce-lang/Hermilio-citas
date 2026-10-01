@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Patients | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/dashboard.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div id="topbar-mount"></div>
+    <div class="content-area">
+      <div class="content-header"><div><h1>My Patients</h1><p>Everyone you've treated or have upcoming visits with.</p></div></div>
+
+      <div class="toolbar">
+        <div class="search-input"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="pSearch" placeholder="Search by name, National ID or Patient ID..."></div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Patient</th><th>Age</th><th>Last Consultation</th><th>Next Appointment</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="pBody"></tbody>
+        </table>
+      </div>
+      <div id="pEmpty"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  const user = Auth.requireRole(['doctor']);
+  if (user) {
+    renderPortalLayout('patients.html');
+    const appts = DB.get(DB_KEYS.appointments).filter(a => a.doctorId === user.doctorId);
+    const consultations = DB.get(DB_KEYS.consultations).filter(c => c.doctorId === user.doctorId);
+    const patientIds = [...new Set(appts.map(a => a.patientId))];
+    const allPatients = DB.get(DB_KEYS.patients).filter(p => patientIds.includes(p.id));
+
+    function age(dob) {
+      const diff = Date.now() - new Date(dob).getTime();
+      return Math.floor(diff / (365.25 * 24 * 3600 * 1000));
+    }
+
+    function render() {
+      const term = document.getElementById('pSearch').value.toLowerCase().trim();
+      const filtered = allPatients.filter(p => !term || p.name.toLowerCase().includes(term) || p.nationalId.includes(term) || p.id.includes(term));
+      const body = document.getElementById('pBody');
+      const empty = document.getElementById('pEmpty');
+      if (filtered.length === 0) { body.innerHTML = ''; emptyState(empty, 'fa-users', 'No patients found', 'Try a different search term.'); return; }
+      empty.innerHTML = '';
+      body.innerHTML = filtered.map(p => {
+        const patientAppts = appts.filter(a => a.patientId === p.id);
+        const last = consultations.filter(c => c.patientId === p.id).sort((a, b) => b.date.localeCompare(a.date))[0];
+        const next = patientAppts.filter(a => a.date >= today() && a.status !== 'Cancelled').sort((a, b) => a.date.localeCompare(b.date))[0];
+        return `<tr>
+          <td><div class="flex items-center gap-12"><img src="${p.photo}" class="avatar" style="width:34px;height:34px;" alt=""><span>${p.name}</span></div></td>
+          <td>${age(p.dob)}</td>
+          <td>${last ? formatDate(last.date) : '—'}</td>
+          <td>${next ? formatDate(next.date) + ' · ' + next.time : '—'}</td>
+          <td>${statusBadge(p.status)}</td>
+          <td class="table-actions">
+            <a href="patient-profile.html?id=${p.id}" class="btn btn-outline btn-sm" data-tooltip="View patient"><i class="fa-solid fa-eye"></i></a>
+            <a href="consultation.html?patient=${p.id}" class="btn btn-outline btn-sm" data-tooltip="Start consultation"><i class="fa-solid fa-notes-medical"></i></a>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+    document.getElementById('pSearch').addEventListener('input', debounce(render, 150));
+    render();
+  }
+</script>
+</body>
+</html>

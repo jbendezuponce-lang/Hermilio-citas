@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Appointments | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/dashboard.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div id="topbar-mount"></div>
+    <div class="content-area">
+      <div class="content-header">
+        <div><h1>Appointment Management</h1><p>Create, confirm, cancel and reschedule appointments.</p></div>
+        <button class="btn btn-primary" id="newApptBtn"><i class="fa-solid fa-plus"></i> Create Appointment</button>
+      </div>
+
+      <div class="toolbar">
+        <div class="search-input"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="aSearch" placeholder="Search patient or doctor..."></div>
+        <select class="filter-select" id="aStatus"><option value="">All Statuses</option><option>Confirmed</option><option>Pending</option><option>Completed</option><option>Cancelled</option></select>
+        <input type="date" id="aDate" class="filter-select">
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Patient</th><th>Doctor</th><th>Date</th><th>Time</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="aBody"></tbody>
+        </table>
+      </div>
+      <div id="aEmpty"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="apptModal">
+  <div class="modal-box modal-lg">
+    <div class="modal-header"><h3>Create Appointment</h3><button class="modal-close" onclick="closeModal('apptModal')">&times;</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label for="mPatient">Patient</label><select id="mPatient"></select></div>
+        <div class="form-group"><label for="mDoctor">Doctor</label><select id="mDoctor"></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label for="mDate">Date</label><input type="date" id="mDate"></div>
+        <div class="form-group"><label for="mTime">Time</label><input type="time" id="mTime"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label for="mType">Consultation Type</label><select id="mType"><option>In person</option><option>Virtual</option></select></div>
+        <div class="form-group"><label for="mStatus">Status</label><select id="mStatus"><option>Pending</option><option>Confirmed</option></select></div>
+      </div>
+      <div class="form-group"><label for="mReason">Reason</label><textarea id="mReason" placeholder="Reason for visit"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('apptModal')">Cancel</button>
+      <button class="btn btn-primary" id="saveApptBtn">Create Appointment</button>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  const user = Auth.requireRole(['receptionist']);
+  if (user) {
+    renderPortalLayout('appointments.html');
+    const patients = DB.get(DB_KEYS.patients);
+    const doctors = DB.get(DB_KEYS.doctors);
+    const patientMap = Object.fromEntries(patients.map(p => [p.id, p]));
+    const doctorMap = Object.fromEntries(doctors.map(d => [d.id, d]));
+
+    document.getElementById('mPatient').innerHTML = patients.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    document.getElementById('mDoctor').innerHTML = doctors.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+    document.getElementById('mDate').min = today();
+
+    function render() {
+      const term = document.getElementById('aSearch').value.toLowerCase().trim();
+      const status = document.getElementById('aStatus').value;
+      const date = document.getElementById('aDate').value;
+      const list = DB.get(DB_KEYS.appointments)
+        .filter(a => !status || a.status === status)
+        .filter(a => !date || a.date === date)
+        .filter(a => !term || patientMap[a.patientId]?.name.toLowerCase().includes(term) || doctorMap[a.doctorId]?.name.toLowerCase().includes(term))
+        .sort((a, b) => b.date.localeCompare(a.date));
+
+      const body = document.getElementById('aBody');
+      const empty = document.getElementById('aEmpty');
+      if (list.length === 0) { body.innerHTML = ''; emptyState(empty, 'fa-calendar-xmark', 'No appointments found', 'Try adjusting your filters.'); return; }
+      empty.innerHTML = '';
+      body.innerHTML = list.map(a => `
+        <tr>
+          <td>${patientMap[a.patientId]?.name || '—'}</td>
+          <td>${doctorMap[a.doctorId]?.name || '—'}</td>
+          <td>${formatDate(a.date)}</td>
+          <td>${a.time}</td>
+          <td>${a.type}</td>
+          <td>${statusBadge(a.status)}</td>
+          <td class="table-actions">
+            ${a.status === 'Pending' ? `<button class="btn btn-outline btn-sm confirm-btn" data-id="${a.id}" data-tooltip="Confirm"><i class="fa-solid fa-check"></i></button>` : ''}
+            ${(a.status === 'Confirmed' || a.status === 'Pending') ? `<button class="btn btn-danger btn-sm cancel-btn" data-id="${a.id}" data-tooltip="Cancel"><i class="fa-solid fa-xmark"></i></button>` : ''}
+          </td>
+        </tr>`).join('');
+
+      qsa('.confirm-btn').forEach(b => b.addEventListener('click', () => {
+        DB.update(DB_KEYS.appointments, b.dataset.id, { status: 'Confirmed' });
+        addAuditLog(user.name, 'Confirmed appointment', 'Appointments');
+        toast('Appointment confirmed.', 'success');
+        render();
+      }));
+      qsa('.cancel-btn').forEach(b => b.addEventListener('click', () => {
+        confirmDialog('Cancel this appointment?', () => {
+          DB.update(DB_KEYS.appointments, b.dataset.id, { status: 'Cancelled' });
+          addAuditLog(user.name, 'Cancelled appointment', 'Appointments');
+          toast('Appointment cancelled.', 'success');
+          render();
+        }, { danger: true, confirmText: 'Cancel Appointment' });
+      }));
+    }
+
+    ['aSearch', 'aStatus', 'aDate'].forEach(id => {
+      document.getElementById(id).addEventListener('input', debounce(render, 150));
+      document.getElementById(id).addEventListener('change', render);
+    });
+
+    document.getElementById('newApptBtn').addEventListener('click', () => openModal('apptModal'));
+    document.getElementById('saveApptBtn').addEventListener('click', () => {
+      const patientId = document.getElementById('mPatient').value;
+      const doctorId = document.getElementById('mDoctor').value;
+      const date = document.getElementById('mDate').value;
+      const time = document.getElementById('mTime').value;
+      const type = document.getElementById('mType').value;
+      const status = document.getElementById('mStatus').value;
+      const reason = document.getElementById('mReason').value.trim();
+
+      if (!date || !time) { toast('Please select a date and time.', 'error'); return; }
+      if (!reason) { toast('Please enter a reason.', 'error'); return; }
+
+      const doc = doctorMap[doctorId];
+      DB.insert(DB_KEYS.appointments, {
+        id: 'APT-' + Math.floor(4000 + Math.random() * 6000), patientId, doctorId,
+        specialtyId: doc.specialtyId, date, time, type, locationId: doc.locationId,
+        reason, status, createdAt: today()
+      });
+      addAuditLog(user.name, 'Created appointment', 'Appointments');
+      closeModal('apptModal');
+      toast('Appointment created successfully!', 'success');
+      render();
+    });
+
+    render();
+  }
+</script>
+</body>
+</html>

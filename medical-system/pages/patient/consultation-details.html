@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consultation Details | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/dashboard.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div id="topbar-mount"></div>
+    <div class="content-area">
+      <div class="breadcrumbs"><a href="medical-history.html">Medical History</a><span class="sep">/</span><span class="current">Consultation</span></div>
+      <div id="wrap"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  const user = Auth.requireRole(['patient']);
+  if (user) {
+    renderPortalLayout('medical-history.html');
+    const id = new URLSearchParams(window.location.search).get('id');
+    const c = DB.find(DB_KEYS.consultations, id);
+    const wrap = document.getElementById('wrap');
+
+    if (!c || c.patientId !== user.patientId) {
+      emptyState(wrap, 'fa-file-circle-xmark', 'Consultation not found', 'This record does not exist or is not yours.');
+    } else {
+      const doc = DB.find(DB_KEYS.doctors, c.doctorId);
+      const spec = DB.find(DB_KEYS.specialties, c.specialtyId);
+      wrap.innerHTML = `
+        <div class="card" style="max-width:760px;">
+          <div class="flex items-center gap-12" style="margin-bottom:20px;">
+            <img src="${doc.photo}" class="avatar" style="width:56px;height:56px;" alt="Portrait of ${doc.name}">
+            <div><strong>${doc.name}</strong><div class="text-muted" style="font-size:.85rem;">${spec.name} · ${formatDateLong(c.date)}</div></div>
+          </div>
+          <div class="grid grid-2" style="margin-bottom:20px;">
+            <div><h4>Reason for Visit</h4><p>${c.reason}</p></div>
+            <div><h4>Symptoms</h4><p>${c.symptoms}</p></div>
+          </div>
+          <h4>Vital Signs</h4>
+          <div class="grid grid-4" style="margin-bottom:20px;">
+            <div class="card" style="padding:14px;"><div class="text-muted" style="font-size:.78rem;">Weight</div><strong>${c.vitals.weight}</strong></div>
+            <div class="card" style="padding:14px;"><div class="text-muted" style="font-size:.78rem;">Height</div><strong>${c.vitals.height}</strong></div>
+            <div class="card" style="padding:14px;"><div class="text-muted" style="font-size:.78rem;">Blood Pressure</div><strong>${c.vitals.bp}</strong></div>
+            <div class="card" style="padding:14px;"><div class="text-muted" style="font-size:.78rem;">Temperature</div><strong>${c.vitals.temp}</strong></div>
+            <div class="card" style="padding:14px;"><div class="text-muted" style="font-size:.78rem;">Heart Rate</div><strong>${c.vitals.hr}</strong></div>
+            <div class="card" style="padding:14px;"><div class="text-muted" style="font-size:.78rem;">Oxygen Saturation</div><strong>${c.vitals.spo2}</strong></div>
+          </div>
+          <div class="grid grid-2" style="margin-bottom:20px;">
+            <div><h4>Diagnosis</h4><p>${c.diagnosis}</p></div>
+            <div><h4>Treatment</h4><p>${c.treatment}</p></div>
+          </div>
+          <h4>Medications</h4>
+          <ul style="margin-bottom:20px;">${c.medications.map(m => `<li style="padding:6px 0;border-bottom:1px solid var(--color-border);"><i class="fa-solid fa-pills" style="color:var(--color-primary);margin-right:8px;"></i>${m}</li>`).join('')}</ul>
+          <div class="grid grid-2" style="margin-bottom:20px;">
+            <div><h4>Recommendations</h4><p>${c.recommendations}</p></div>
+            <div><h4>Notes</h4><p>${c.notes}</p></div>
+          </div>
+          <h4>Follow-up Date</h4>
+          <p>${c.followUp ? formatDate(c.followUp) : 'No follow-up scheduled'}</p>
+        </div>`;
+    }
+  }
+</script>
+</body>
+</html>

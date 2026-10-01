@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reception Dashboard | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/dashboard.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div id="topbar-mount"></div>
+    <div class="content-area">
+      <div class="content-header">
+        <div><h1 id="welcomeMsg">Welcome back!</h1><p>Front-desk overview for today.</p></div>
+        <a href="appointments.html" class="btn btn-primary"><i class="fa-solid fa-calendar-plus"></i> New Appointment</a>
+      </div>
+      <div class="dashboard-grid" id="statsGrid"></div>
+      <div class="two-col">
+        <div class="card">
+          <div class="flex justify-between items-center" style="margin-bottom:14px;"><h4 style="margin:0;">Today's Appointments</h4><a href="appointments.html" style="font-size:.85rem;font-weight:600;">View all</a></div>
+          <div id="todayList"></div>
+        </div>
+        <div class="card">
+          <h4 style="margin-bottom:14px;">Available Doctors Today</h4>
+          <div id="docsToday"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  const user = Auth.requireRole(['receptionist']);
+  if (user) {
+    renderPortalLayout('dashboard.html');
+    document.getElementById('welcomeMsg').textContent = 'Welcome back, ' + user.name.split(' ')[0] + '!';
+
+    const appts = DB.get(DB_KEYS.appointments);
+    const patients = Object.fromEntries(DB.get(DB_KEYS.patients).map(p => [p.id, p]));
+    const doctors = Object.fromEntries(DB.get(DB_KEYS.doctors).map(d => [d.id, d]));
+    const todayAppts = appts.filter(a => a.date === today() && a.status !== 'Cancelled').sort((a, b) => a.time.localeCompare(b.time));
+    const patientsToday = new Set(todayAppts.map(a => a.patientId));
+    const pending = appts.filter(a => a.status === 'Pending');
+    const cancelled = appts.filter(a => a.status === 'Cancelled' && a.date === today());
+
+    document.getElementById('statsGrid').innerHTML = `
+      <div class="card stat-card"><div class="stat-icon blue"><i class="fa-solid fa-calendar-day"></i></div><div><div class="stat-value">${todayAppts.length}</div><div class="stat-label">Appointments Today</div></div></div>
+      <div class="card stat-card"><div class="stat-icon teal"><i class="fa-solid fa-users"></i></div><div><div class="stat-value">${patientsToday.size}</div><div class="stat-label">Patients Today</div></div></div>
+      <div class="card stat-card"><div class="stat-icon amber"><i class="fa-solid fa-hourglass-half"></i></div><div><div class="stat-value">${pending.length}</div><div class="stat-label">Pending Appointments</div></div></div>
+      <div class="card stat-card"><div class="stat-icon red"><i class="fa-solid fa-calendar-xmark"></i></div><div><div class="stat-value">${cancelled.length}</div><div class="stat-label">Cancelled Today</div></div></div>`;
+
+    const todayList = document.getElementById('todayList');
+    if (todayAppts.length === 0) { emptyState(todayList, 'fa-calendar-xmark', 'No appointments today', 'Nothing scheduled yet.'); }
+    else {
+      todayList.innerHTML = todayAppts.map(a => {
+        const p = patients[a.patientId]; const d = doctors[a.doctorId];
+        return `<div class="calendar-day-slot">
+          <div class="time">${a.time}</div>
+          <div style="flex:1;"><strong style="font-size:.9rem;">${p.name}</strong><div class="text-muted" style="font-size:.8rem;">with ${d.name}</div></div>
+          ${statusBadge(a.status)}
+        </div>`;
+      }).join('');
+    }
+
+    const allDoctors = DB.get(DB_KEYS.doctors);
+    document.getElementById('docsToday').innerHTML = allDoctors.slice(0, 6).map(d => `
+      <div class="flex items-center justify-between" style="padding:10px 0;border-bottom:1px solid var(--color-border);">
+        <div class="flex items-center gap-12"><img src="${d.photo}" class="avatar-sm" style="border-radius:50%;object-fit:cover;width:34px;height:34px;" alt=""><span style="font-size:.88rem;font-weight:600;">${d.name}</span></div>
+        ${statusBadge(d.status)}
+      </div>`).join('');
+  }
+</script>
+</body>
+</html>

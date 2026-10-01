@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Patient Profile | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/dashboard.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div id="topbar-mount"></div>
+    <div class="content-area">
+      <div class="breadcrumbs"><a href="patients.html">Patients</a><span class="sep">/</span><span class="current">Profile</span></div>
+      <div id="wrap"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  const user = Auth.requireRole(['doctor']);
+  if (user) {
+    renderPortalLayout('patients.html');
+    const id = new URLSearchParams(window.location.search).get('id');
+    const p = DB.find(DB_KEYS.patients, id);
+    const wrap = document.getElementById('wrap');
+
+    if (!p) { emptyState(wrap, 'fa-user-slash', 'Patient not found', 'This patient record does not exist.'); }
+    else {
+      const consultations = DB.get(DB_KEYS.consultations).filter(c => c.patientId === p.id).sort((a, b) => b.date.localeCompare(a.date));
+      const docs = DB.get(DB_KEYS.documents).filter(d => d.patientId === p.id);
+      const specMap = Object.fromEntries(DB.get(DB_KEYS.specialties).map(s => [s.id, s.name]));
+
+      wrap.innerHTML = `
+        <div class="two-col">
+          <div>
+            <div class="card" style="margin-bottom:20px;">
+              <div class="flex items-center gap-16">
+                <img src="${p.photo}" class="avatar-lg" style="width:80px;height:80px;" alt="">
+                <div>
+                  <h3 style="margin-bottom:2px;">${p.name}</h3>
+                  <p class="text-muted" style="margin:0;">ID: ${p.id} · National ID: ${p.nationalId}</p>
+                </div>
+              </div>
+              <div class="grid grid-2" style="margin-top:20px;">
+                <div><h4>Date of Birth</h4><p>${formatDate(p.dob)}</p></div>
+                <div><h4>Gender</h4><p>${p.gender}</p></div>
+                <div><h4>Phone</h4><p>${p.phone}</p></div>
+                <div><h4>Email</h4><p>${p.email}</p></div>
+                <div><h4>Blood Type</h4><p>${p.bloodType}</p></div>
+                <div><h4>Allergies</h4><p>${p.allergies.join(', ')}</p></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h4>Consultation History</h4>
+              <div class="timeline" style="margin-top:16px;">
+                ${consultations.length ? consultations.map(c => `
+                  <div class="timeline-item">
+                    <div class="timeline-date">${formatDateLong(c.date)}</div>
+                    <h4 style="margin:6px 0 4px;">${c.diagnosis}</h4>
+                    <p style="font-size:.88rem;margin-bottom:8px;">${specMap[c.specialtyId]}</p>
+                    <a href="#" class="btn btn-outline btn-sm view-consult" data-id="${c.id}">View Full Details</a>
+                  </div>`).join('') : '<p class="text-muted">No consultation history yet.</p>'}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="card" style="margin-bottom:20px;">
+              <a href="consultation.html?patient=${p.id}" class="btn btn-primary btn-block"><i class="fa-solid fa-notes-medical"></i> Start Consultation</a>
+            </div>
+            <div class="card">
+              <h4>Medical Documents</h4>
+              ${docs.length ? docs.map(d => `
+                <div style="padding:10px 0;border-bottom:1px solid var(--color-border);font-size:.88rem;">
+                  <i class="fa-solid fa-file-pdf" style="color:var(--color-danger);margin-right:6px;"></i>${d.name}
+                  <div class="text-muted" style="font-size:.78rem;">${d.type} · ${formatDate(d.date)}</div>
+                </div>`).join('') : '<p class="text-muted">No documents available.</p>'}
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-overlay" id="consultModal">
+          <div class="modal-box modal-lg">
+            <div class="modal-header"><h3>Consultation Details</h3><button class="modal-close" onclick="closeModal('consultModal')">&times;</button></div>
+            <div class="modal-body" id="consultModalBody"></div>
+          </div>
+        </div>`;
+
+      qsa('.view-consult').forEach(btn => btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const c = consultations.find(x => x.id === btn.dataset.id);
+        document.getElementById('consultModalBody').innerHTML = `
+          <p><strong>Reason:</strong> ${c.reason}</p>
+          <p><strong>Symptoms:</strong> ${c.symptoms}</p>
+          <p><strong>Diagnosis:</strong> ${c.diagnosis}</p>
+          <p><strong>Treatment:</strong> ${c.treatment}</p>
+          <p><strong>Medications:</strong> ${c.medications.join(', ')}</p>
+          <p><strong>Recommendations:</strong> ${c.recommendations}</p>
+          <p><strong>Notes:</strong> ${c.notes}</p>`;
+        openModal('consultModal');
+      }));
+    }
+  }
+</script>
+</body>
+</html>

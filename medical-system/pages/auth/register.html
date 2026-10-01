@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create Account | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-card wide">
+    <a href="../../index.html" class="auth-brand"><i class="fa-solid fa-heart-pulse"></i> MediCare<em style="color:var(--color-primary);font-style:normal;">+</em></a>
+    <p class="auth-subtitle text-center">Create your patient account in under a minute</p>
+
+    <form id="registerForm" novalidate>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="firstName">First Name <span class="req">*</span></label>
+          <input type="text" id="firstName" name="firstName" placeholder="John">
+        </div>
+        <div class="form-group">
+          <label for="lastName">Last Name <span class="req">*</span></label>
+          <input type="text" id="lastName" name="lastName" placeholder="Carter">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="nationalId">National ID <span class="req">*</span></label>
+          <input type="text" id="nationalId" name="nationalId" placeholder="e.g. 912345678">
+        </div>
+        <div class="form-group">
+          <label for="dob">Date of Birth <span class="req">*</span></label>
+          <input type="date" id="dob" name="dob">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="gender">Gender <span class="req">*</span></label>
+          <select id="gender" name="gender">
+            <option value="">Select...</option>
+            <option>Female</option>
+            <option>Male</option>
+            <option>Other</option>
+            <option>Prefer not to say</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="phone">Phone <span class="req">*</span></label>
+          <input type="tel" id="phone" name="phone" placeholder="+1 (555) 000-0000">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="email">Email <span class="req">*</span></label>
+        <input type="email" id="email" name="email" placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label for="address">Address <span class="req">*</span></label>
+        <input type="text" id="address" name="address" placeholder="Street, City">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="password">Password <span class="req">*</span></label>
+          <input type="password" id="password" name="password" placeholder="Create a password">
+          <div class="password-strength" id="strengthBar"><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="strength-label" id="strengthLabel">Password strength</div>
+        </div>
+        <div class="form-group">
+          <label for="confirmPassword">Confirm Password <span class="req">*</span></label>
+          <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Repeat your password">
+        </div>
+      </div>
+      <div class="checkbox-row" style="margin-bottom:22px;">
+        <input type="checkbox" id="terms" name="terms">
+        <label for="terms">I agree to the <a href="../help/terms.html" target="_blank">Terms &amp; Conditions</a> and <a href="../help/privacy.html" target="_blank">Privacy Policy</a></label>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg">Create Account</button>
+    </form>
+
+    <p class="text-center" style="font-size:.9rem;margin-top:18px;">Already have an account? <a href="login.html" style="font-weight:700;">Sign in</a></p>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script>
+  Auth.redirectIfLoggedIn();
+
+  const pwInput = document.getElementById('password');
+  pwInput.addEventListener('input', () => {
+    const score = passwordStrength(pwInput.value);
+    const bar = document.getElementById('strengthBar');
+    bar.className = 'password-strength s' + score;
+    const labels = ['Too weak', 'Weak', 'Fair', 'Good', 'Strong', 'Very strong'];
+    document.getElementById('strengthLabel').textContent = pwInput.value ? labels[score] : 'Password strength';
+  });
+
+  document.getElementById('registerForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const form = e.target;
+    clearAllFieldErrors(form);
+    let valid = true;
+    const data = Object.fromEntries(new FormData(form).entries());
+
+    if (!data.firstName?.trim()) { showFieldError(form.firstName, 'First name is required.'); valid = false; }
+    if (!data.lastName?.trim()) { showFieldError(form.lastName, 'Last name is required.'); valid = false; }
+    if (!data.nationalId?.trim()) { showFieldError(form.nationalId, 'National ID is required.'); valid = false; }
+    else if (data.nationalId.trim().length < 8 || data.nationalId.trim().length > 15) { showFieldError(form.nationalId, 'National ID must be 8 to 15 characters.'); valid = false; }
+    if (!data.dob) { showFieldError(form.dob, 'Date of birth is required.'); valid = false; }
+    else if (new Date(data.dob) > new Date()) { showFieldError(form.dob, 'Date of birth cannot be in the future.'); valid = false; }
+    if (!data.gender) { showFieldError(form.gender, 'Please select a gender.'); valid = false; }
+    if (!data.phone?.trim()) { showFieldError(form.phone, 'Phone is required.'); valid = false; }
+    else if (!isValidPhone(data.phone)) { showFieldError(form.phone, 'Enter a valid phone number.'); valid = false; }
+    if (!data.email?.trim()) { showFieldError(form.email, 'Email is required.'); valid = false; }
+    else if (!isValidEmail(data.email)) { showFieldError(form.email, 'Enter a valid email address.'); valid = false; }
+    if (!data.address?.trim()) { showFieldError(form.address, 'Address is required.'); valid = false; }
+    if (!data.password) { showFieldError(form.password, 'Password is required.'); valid = false; }
+    else if (data.password.length < 8 || data.password.length > 72) { showFieldError(form.password, 'Password must be between 8 and 72 characters.'); valid = false; }
+    else if (passwordStrength(data.password) < 2) { showFieldError(form.password, 'Password is too weak. Use 8+ characters with numbers/symbols.'); valid = false; }
+    if (data.confirmPassword !== data.password) { showFieldError(form.confirmPassword, 'Passwords do not match.'); valid = false; }
+    if (!form.terms.checked) { toast('You must accept the Terms & Conditions to continue.', 'error'); valid = false; }
+
+    if (!valid) return;
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    const result = await Auth.register(data);
+    submitBtn.disabled = false;
+    if (!result.ok) { toast(result.message, 'error'); return; }
+    toast('Account created successfully! Redirecting to login...', 'success');
+    form.reset();
+    setTimeout(() => { window.location.href = 'login.html'; }, 1200);
+  });
+</script>
+</body>
+</html>

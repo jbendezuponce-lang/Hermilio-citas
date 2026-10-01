@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FAQ | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div id="public-navbar-mount"></div>
+<section class="page-hero"><div class="container"><h1>Frequently Asked Questions</h1><p>Everything you need to know about using MediCare+.</p></div></section>
+<section class="section"><div class="container" style="max-width:800px;" id="faqList"></div></section>
+<div id="footer-mount"></div>
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  renderPublicNavbar(''); renderFooter();
+  const faqs = [
+    { q: 'Is MediCare+ free to use for patients?', a: 'Yes, creating a patient account and booking appointments is completely free of charge.' },
+    { q: 'How do I book an appointment?', a: 'Create an account or log in, then use "Book Appointment" to choose a specialty, doctor, date, time and consultation type.' },
+    { q: 'Can I cancel or reschedule?', a: 'Yes — from "My Appointments" you can cancel or reschedule any appointment that is still upcoming.' },
+    { q: 'Are virtual consultations supported?', a: 'Many doctors offer virtual consultations. You can filter for "Virtual" when browsing doctors.' },
+    { q: 'How do I access my medical history?', a: 'Your full consultation history, diagnoses and documents are available under "Medical History" and "Documents".' },
+    { q: 'Is my data secure?', a: 'This demo uses simulated local storage for illustration purposes only — see our Privacy Policy for details.' },
+    { q: 'How do doctors register consultations?', a: 'Doctors use "Register Consultation" to log vitals, diagnosis, treatment and medications, which automatically updates the patient record.' }
+  ];
+  document.getElementById('faqList').innerHTML = faqs.map((f, i) => `
+    <div class="faq-item ${i === 0 ? 'open' : ''}">
+      <div class="faq-question">${f.q} <i class="fa-solid fa-chevron-down"></i></div>
+      <div class="faq-answer">${f.a}</div>
+    </div>`).join('');
+  qsa('.faq-question').forEach(q => q.addEventListener('click', () => q.parentElement.classList.toggle('open')));
+</script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Specialties | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div id="public-navbar-mount"></div>
+
+<section class="page-hero">
+  <div class="container">
+    <h1>Medical Specialties</h1>
+    <p>Find the right specialist for your health needs.</p>
+  </div>
+</section>
+
+<section class="section" style="padding-top:40px;">
+  <div class="container">
+    <div class="toolbar">
+      <div class="search-input">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="search" id="specSearch" placeholder="Search specialties...">
+      </div>
+    </div>
+    <div class="grid grid-4" id="specGrid"></div>
+    <div id="specEmpty" style="display:none;"></div>
+  </div>
+</section>
+
+<div id="footer-mount"></div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  renderPublicNavbar('specialties');
+  renderFooter();
+
+  function renderSpecialties(list) {
+    const grid = document.getElementById('specGrid');
+    const empty = document.getElementById('specEmpty');
+    if (list.length === 0) {
+      grid.innerHTML = '';
+      empty.style.display = 'block';
+      emptyState(empty, 'fa-magnifying-glass', 'No specialties found', 'Try a different search term.');
+      return;
+    }
+    empty.style.display = 'none';
+    grid.innerHTML = list.map(s => `
+      <div class="card card-hover specialty-card">
+        <div class="spec-icon"><i class="fa-solid ${s.icon}"></i></div>
+        <h4>${s.name}</h4>
+        <p style="font-size:.85rem;">${s.description}</p>
+        <div class="count">${s.doctorCount} doctors available</div>
+        <a href="doctors.html?specialty=${s.id}" class="btn btn-outline btn-sm btn-block">View Doctors</a>
+      </div>`).join('');
+  }
+
+  const allSpecialties = DB.get(DB_KEYS.specialties);
+  renderSpecialties(allSpecialties);
+
+  document.getElementById('specSearch').addEventListener('input', debounce((e) => {
+    const term = e.target.value.toLowerCase().trim();
+    renderSpecialties(allSpecialties.filter(s => s.name.toLowerCase().includes(term) || s.description.toLowerCase().includes(term)));
+  }, 150));
+</script>
+</body>
+</html>

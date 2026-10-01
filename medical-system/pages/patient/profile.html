@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Profile | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/dashboard.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div id="topbar-mount"></div>
+    <div class="content-area">
+      <div class="content-header"><div><h1>My Profile</h1><p>Update your personal information.</p></div></div>
+
+      <div class="two-col">
+        <div class="card">
+          <form id="profileForm" novalidate>
+            <div class="form-row">
+              <div class="form-group"><label for="firstName">First Name <span class="req">*</span></label><input type="text" id="firstName"></div>
+              <div class="form-group"><label for="lastName">Last Name <span class="req">*</span></label><input type="text" id="lastName"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label for="nationalId">National ID</label><input type="text" id="nationalId"></div>
+              <div class="form-group"><label for="dob">Date of Birth</label><input type="date" id="dob"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label for="gender">Gender</label>
+                <select id="gender"><option>Female</option><option>Male</option><option>Other</option><option>Prefer not to say</option></select>
+              </div>
+              <div class="form-group"><label for="phone">Phone <span class="req">*</span></label><input type="tel" id="phone"></div>
+            </div>
+            <div class="form-group"><label for="email">Email <span class="req">*</span></label><input type="email" id="email"></div>
+            <div class="form-group"><label for="address">Address</label><input type="text" id="address"></div>
+            <div class="flex gap-12">
+              <button type="submit" class="btn btn-primary">Save Changes</button>
+              <button type="button" class="btn btn-ghost" id="cancelBtn">Cancel</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card text-center" style="height:fit-content;">
+          <img id="profilePhoto" class="avatar-lg" style="margin:0 auto 14px;width:120px;height:120px;" alt="Your profile photo">
+          <h4 id="profileName" style="margin-bottom:2px;"></h4>
+          <p class="text-muted" id="profileEmail" style="font-size:.85rem;"></p>
+          <button class="btn btn-outline btn-sm btn-block" id="changePhotoBtn"><i class="fa-solid fa-camera"></i> Change Photo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  const user = Auth.requireRole(['patient']);
+  if (user) {
+    renderPortalLayout('profile.html');
+    const patient = DB.find(DB_KEYS.patients, user.patientId);
+
+    function fillForm() {
+      const [first, ...rest] = patient.name.split(' ');
+      document.getElementById('firstName').value = first;
+      document.getElementById('lastName').value = rest.join(' ');
+      document.getElementById('nationalId').value = patient.nationalId;
+      document.getElementById('dob').value = patient.dob;
+      document.getElementById('gender').value = patient.gender;
+      document.getElementById('phone').value = patient.phone;
+      document.getElementById('email').value = patient.email;
+      document.getElementById('address').value = patient.address;
+      document.getElementById('profilePhoto').src = patient.photo;
+      document.getElementById('profileName').textContent = patient.name;
+      document.getElementById('profileEmail').textContent = patient.email;
+    }
+    fillForm();
+
+    document.getElementById('changePhotoBtn').addEventListener('click', () => toast('Photo upload is simulated in this demo.', 'info'));
+    document.getElementById('cancelBtn').addEventListener('click', fillForm);
+
+    document.getElementById('profileForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const form = e.target;
+      clearAllFieldErrors(form);
+      let valid = true;
+      if (!document.getElementById('firstName').value.trim()) { showFieldError(document.getElementById('firstName'), 'Required.'); valid = false; }
+      if (!document.getElementById('lastName').value.trim()) { showFieldError(document.getElementById('lastName'), 'Required.'); valid = false; }
+      const email = document.getElementById('email').value.trim();
+      if (!isValidEmail(email)) { showFieldError(document.getElementById('email'), 'Enter a valid email.'); valid = false; }
+      const phone = document.getElementById('phone').value.trim();
+      if (!isValidPhone(phone)) { showFieldError(document.getElementById('phone'), 'Enter a valid phone.'); valid = false; }
+      if (!valid) return;
+
+      const name = document.getElementById('firstName').value.trim() + ' ' + document.getElementById('lastName').value.trim();
+      DB.update(DB_KEYS.patients, patient.id, {
+        name, nationalId: document.getElementById('nationalId').value.trim(),
+        dob: document.getElementById('dob').value, gender: document.getElementById('gender').value,
+        phone, email, address: document.getElementById('address').value.trim()
+      });
+      DB.update(DB_KEYS.users, user.id, { name, email });
+      const session = Auth.currentUser(); session.name = name; session.email = email;
+      localStorage.setItem(DB_KEYS.session, JSON.stringify(session));
+      addAuditLog(name, 'Updated profile information', 'Patients');
+      toast('Profile updated successfully!', 'success');
+      setTimeout(() => window.location.reload(), 700);
+    });
+  }
+</script>
+</body>
+</html>

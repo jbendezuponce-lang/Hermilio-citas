@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agenda | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/dashboard.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div id="topbar-mount"></div>
+    <div class="content-area">
+      <div class="content-header"><div><h1>My Agenda</h1><p>Your confirmed, pending and completed appointments.</p></div></div>
+
+      <div class="tabs" id="viewTabs">
+        <button class="tab-btn active" data-view="day">Day</button>
+        <button class="tab-btn" data-view="week">Week</button>
+        <button class="tab-btn" data-view="month">Month</button>
+      </div>
+
+      <div class="toolbar" style="margin-top:18px;">
+        <input type="date" id="agendaDate" class="filter-select">
+        <select class="filter-select" id="statusFilter">
+          <option value="">All Statuses</option>
+          <option>Confirmed</option><option>Pending</option><option>Completed</option><option>Cancelled</option>
+        </select>
+      </div>
+
+      <div class="card"><div id="agendaList"></div></div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  const user = Auth.requireRole(['doctor']);
+  if (user) {
+    renderPortalLayout('agenda.html');
+    const patients = Object.fromEntries(DB.get(DB_KEYS.patients).map(p => [p.id, p]));
+    let view = 'day';
+    document.getElementById('agendaDate').value = today();
+
+    function inRange(dateStr, refDate) {
+      const d = new Date(dateStr + 'T00:00:00');
+      const ref = new Date(refDate + 'T00:00:00');
+      if (view === 'day') return dateStr === refDate;
+      if (view === 'week') {
+        const start = new Date(ref); start.setDate(ref.getDate() - ref.getDay());
+        const end = new Date(start); end.setDate(start.getDate() + 6);
+        return d >= start && d <= end;
+      }
+      if (view === 'month') return d.getMonth() === ref.getMonth() && d.getFullYear() === ref.getFullYear();
+      return false;
+    }
+
+    function render() {
+      const refDate = document.getElementById('agendaDate').value || today();
+      const status = document.getElementById('statusFilter').value;
+      const appts = DB.get(DB_KEYS.appointments)
+        .filter(a => a.doctorId === user.doctorId)
+        .filter(a => inRange(a.date, refDate))
+        .filter(a => !status || a.status === status)
+        .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+
+      const box = document.getElementById('agendaList');
+      if (appts.length === 0) { emptyState(box, 'fa-calendar-xmark', 'No appointments found', 'Nothing scheduled in this range.'); return; }
+      box.innerHTML = appts.map(a => {
+        const p = patients[a.patientId];
+        return `<div class="calendar-day-slot">
+          <div class="time">${formatDate(a.date)}<br><span style="font-weight:400;font-size:.78rem;">${a.time}</span></div>
+          <img src="${p.photo}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" alt="">
+          <div style="flex:1;"><strong style="font-size:.9rem;">${p.name}</strong><div class="text-muted" style="font-size:.8rem;">${a.reason} · ${a.type}</div></div>
+          ${statusBadge(a.status)}
+        </div>`;
+      }).join('');
+    }
+
+    qsa('.tab-btn').forEach(b => b.addEventListener('click', () => {
+      qsa('.tab-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active'); view = b.dataset.view; render();
+    }));
+    document.getElementById('agendaDate').addEventListener('change', render);
+    document.getElementById('statusFilter').addEventListener('change', render);
+    render();
+  }
+</script>
+</body>
+</html>

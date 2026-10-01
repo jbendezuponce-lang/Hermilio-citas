@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Access Denied | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;background:#fef2f2;">
+  <div>
+    <div style="font-size:6rem;font-weight:800;color:var(--color-danger);line-height:1;">403</div>
+    <h2>Access Denied</h2>
+    <p style="max-width:420px;margin:0 auto 24px;">You don't have permission to view this page with your current account role.</p>
+    <div class="flex gap-12" style="justify-content:center;">
+      <a href="#" id="dashLink" class="btn btn-primary btn-lg">Go to My Dashboard</a>
+      <a href="../../index.html" class="btn btn-outline btn-lg">Home</a>
+    </div>
+  </div>
+</div>
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script>
+  const user = Auth.currentUser();
+  document.getElementById('dashLink').href = user ? dashboardFor(user.role) : 'auth/login.html';
+</script>
+</body>
+</html>

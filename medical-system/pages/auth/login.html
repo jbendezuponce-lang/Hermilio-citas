@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-card">
+    <a href="../../index.html" class="auth-brand"><i class="fa-solid fa-heart-pulse"></i> MediCare<em style="color:var(--color-primary);font-style:normal;">+</em></a>
+    <p class="auth-subtitle text-center">Sign in to manage your appointments and records</p>
+
+    <form id="loginForm" novalidate>
+      <div class="form-group">
+        <label for="email">Email <span class="req">*</span></label>
+        <input type="email" id="email" name="email" placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label for="password">Password <span class="req">*</span></label>
+        <div class="input-group">
+          <input type="password" id="password" name="password" placeholder="Enter your password">
+          <button type="button" class="toggle-visibility" data-target="password"><i class="fa-solid fa-eye"></i></button>
+        </div>
+      </div>
+      <div class="flex justify-between items-center" style="margin-bottom:20px;">
+        <div class="checkbox-row">
+          <input type="checkbox" id="remember" name="remember">
+          <label for="remember">Remember me</label>
+        </div>
+        <a href="forgot-password.html" style="font-size:.85rem;font-weight:600;">Forgot password?</a>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg">Login</button>
+    </form>
+
+    <div class="auth-divider">or</div>
+    <p class="text-center" style="font-size:.9rem;">Don't have an account? <a href="register.html" style="font-weight:700;">Create one</a></p>
+
+    <div class="demo-accounts">
+      <h5><i class="fa-solid fa-flask"></i> Demo accounts (click to autofill)</h5>
+      <div class="demo-row" data-email="paciente@hermilio.com" data-pass="admin123"><span>Patient</span><span>paciente@hermilio.com</span></div>
+      <div class="demo-row" data-email="medico@hermilio.com" data-pass="admin123"><span>Doctor</span><span>medico@hermilio.com</span></div>
+      <div class="demo-row" data-email="recepcion@hermilio.com" data-pass="admin123"><span>Receptionist</span><span>recepcion@hermilio.com</span></div>
+      <div class="demo-row" data-email="admin@hermilio.com" data-pass="admin123"><span>Administrator</span><span>admin@hermilio.com</span></div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script>
+  Auth.redirectIfLoggedIn();
+
+  qsa('.demo-row').forEach(row => {
+    row.addEventListener('click', () => {
+      document.getElementById('email').value = row.dataset.email;
+      document.getElementById('password').value = row.dataset.pass;
+    });
+  });
+
+  qsa('.toggle-visibility').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = document.getElementById(btn.dataset.target);
+      const icon = btn.querySelector('i');
+      if (target.type === 'password') { target.type = 'text'; icon.className = 'fa-solid fa-eye-slash'; }
+      else { target.type = 'password'; icon.className = 'fa-solid fa-eye'; }
+    });
+  });
+
+  // Se agregó "async" a la función
+  document.getElementById('loginForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const form = e.target;
+    clearAllFieldErrors(form);
+    let valid = true;
+    const email = form.email.value.trim();
+    const password = form.password.value;
+
+    if (!email) { showFieldError(form.email, 'Email is required.'); valid = false; }
+    else if (!isValidEmail(email)) { showFieldError(form.email, 'Enter a valid email address.'); valid = false; }
+    if (!password) { showFieldError(form.password, 'Password is required.'); valid = false; }
+    if (!valid) return;
+
+    // Se agregó "await" antes de llamar al backend
+    const result = await Auth.login(email, password);
+    
+    if (!result.ok) {
+      toast(result.message, 'error');
+      return;
+    }
+    
+    toast('Welcome back, ' + result.user.name.split(' ')[0] + '!', 'success', 1500);
+    setTimeout(() => { window.location.href = dashboardFor(result.user.role); }, 500);
+  });
+</script>
+</body>
+</html>

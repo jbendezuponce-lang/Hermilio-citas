@@ -1,0 +1,50 @@
+/* ==========================================================================
+   forms.css — Inputs, selects, textareas, checkboxes, validation states
+   ========================================================================== */
+
+.form-group { margin-bottom: 18px; }
+label { display: block; font-weight: 600; font-size: .88rem; margin-bottom: 7px; color: var(--color-text); }
+label .req { color: var(--color-danger); }
+.form-hint { font-size: .78rem; color: var(--color-text-light); margin-top: 5px; }
+
+input[type="text"], input[type="email"], input[type="password"], input[type="tel"],
+input[type="date"], input[type="number"], input[type="search"], select, textarea {
+  width: 100%; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  font-family: inherit; font-size: .92rem; color: var(--color-text); background: #fff; transition: border-color .15s ease;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--color-primary); }
+textarea { resize: vertical; min-height: 100px; }
+input.is-invalid, select.is-invalid, textarea.is-invalid { border-color: var(--color-danger); }
+.field-error { color: var(--color-danger); font-size: .78rem; margin-top: 6px; display: flex; align-items: center; gap: 5px; }
+.field-error::before { content: '\f06a'; font-family: 'Font Awesome 6 Free'; font-weight: 900; }
+
+.input-group { position: relative; }
+.input-group .toggle-visibility { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--color-text-light); }
+
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+.checkbox-row { display: flex; align-items: center; gap: 9px; }
+.checkbox-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--color-primary); }
+.checkbox-row label { margin: 0; font-weight: 500; }
+
+.password-strength { display: flex; gap: 5px; margin-top: 8px; }
+.password-strength span { flex: 1; height: 5px; border-radius: 3px; background: var(--color-border); }
+.password-strength.s1 span:nth-child(1) { background: var(--color-danger); }
+.password-strength.s2 span:nth-child(-n+2) { background: var(--color-warning); }
+.password-strength.s3 span:nth-child(-n+3) { background: #f59e0b; }
+.password-strength.s4 span:nth-child(-n+4) { background: var(--color-success); }
+.password-strength.s5 span { background: var(--color-success); }
+.strength-label { font-size: .78rem; margin-top: 5px; color: var(--color-text-light); }
+
+.auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 20px; background: linear-gradient(160deg, var(--color-primary-light), var(--color-bg)); }
+.auth-card { width: 100%; max-width: 460px; background: #fff; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); padding: 40px 36px; }
+.auth-card.wide { max-width: 640px; }
+.auth-brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1.25rem; justify-content: center; margin-bottom: 6px; }
+.auth-brand i { color: var(--color-primary); }
+.auth-subtitle { text-align: center; margin-bottom: 26px; }
+.auth-divider { display: flex; align-items: center; gap: 12px; margin: 22px 0; color: var(--color-text-light); font-size: .82rem; }
+.auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--color-border); }
+.demo-accounts { background: var(--color-bg); border: 1px dashed var(--color-border); border-radius: var(--radius-sm); padding: 14px; margin-top: 20px; font-size: .82rem; }
+.demo-accounts h5 { margin-bottom: 8px; font-size: .85rem; }
+.demo-accounts .demo-row { display: flex; justify-content: space-between; padding: 5px 0; cursor: pointer; }
+.demo-accounts .demo-row:hover { color: var(--color-primary); }

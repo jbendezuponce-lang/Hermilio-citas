@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Specialty Management | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/dashboard.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div id="topbar-mount"></div>
+    <div class="content-area">
+      <div class="content-header">
+        <div><h1>Specialty Management</h1><p>Manage the medical specialties offered on the platform.</p></div>
+        <button class="btn btn-primary" id="newBtn"><i class="fa-solid fa-plus"></i> Add Specialty</button>
+      </div>
+      <div class="grid grid-4" id="specGrid"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="specModal">
+  <div class="modal-box">
+    <div class="modal-header"><h3 id="modalTitle">Add Specialty</h3><button class="modal-close" onclick="closeModal('specModal')">&times;</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="editId">
+      <div class="form-group"><label for="fName">Name</label><input type="text" id="fName"></div>
+      <div class="form-group"><label for="fIcon">Icon (Font Awesome class)</label><input type="text" id="fIcon" placeholder="fa-heart-pulse"></div>
+      <div class="form-group"><label for="fDesc">Description</label><textarea id="fDesc"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('specModal')">Cancel</button>
+      <button class="btn btn-primary" id="saveBtn">Save Specialty</button>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  const user = Auth.requireRole(['admin']);
+  if (user) {
+    renderPortalLayout('specialties.html');
+
+    function render() {
+      const list = DB.get(DB_KEYS.specialties);
+      document.getElementById('specGrid').innerHTML = list.map(s => `
+        <div class="card specialty-card">
+          <div class="spec-icon"><i class="fa-solid ${s.icon}"></i></div>
+          <h4>${s.name}</h4>
+          <p style="font-size:.85rem;">${s.description}</p>
+          <div class="flex justify-between items-center" style="margin-top:10px;">
+            ${statusBadge(s.status)}
+            <div class="flex gap-8">
+              <button class="btn btn-outline btn-sm edit-btn" data-id="${s.id}"><i class="fa-solid fa-pen"></i></button>
+              <button class="btn btn-outline btn-sm toggle-btn" data-id="${s.id}"><i class="fa-solid ${s.status === 'Active' ? 'fa-toggle-on' : 'fa-toggle-off'}"></i></button>
+              <button class="btn btn-danger btn-sm del-btn" data-id="${s.id}"><i class="fa-solid fa-trash"></i></button>
+            </div>
+          </div>
+        </div>`).join('');
+
+      qsa('.edit-btn').forEach(b => b.addEventListener('click', () => {
+        const s = DB.find(DB_KEYS.specialties, b.dataset.id);
+        document.getElementById('modalTitle').textContent = 'Edit Specialty';
+        document.getElementById('editId').value = s.id;
+        document.getElementById('fName').value = s.name;
+        document.getElementById('fIcon').value = s.icon;
+        document.getElementById('fDesc').value = s.description;
+        openModal('specModal');
+      }));
+      qsa('.toggle-btn').forEach(b => b.addEventListener('click', () => {
+        const s = DB.find(DB_KEYS.specialties, b.dataset.id);
+        DB.update(DB_KEYS.specialties, s.id, { status: s.status === 'Active' ? 'Inactive' : 'Active' });
+        addAuditLog(user.name, 'Toggled specialty status', 'Specialties');
+        render();
+      }));
+      qsa('.del-btn').forEach(b => b.addEventListener('click', () => {
+        confirmDialog('Delete this specialty?', () => {
+          DB.remove(DB_KEYS.specialties, b.dataset.id);
+          addAuditLog(user.name, 'Deleted specialty', 'Specialties');
+          toast('Specialty deleted.', 'success');
+          render();
+        }, { danger: true, confirmText: 'Delete' });
+      }));
+    }
+
+    document.getElementById('newBtn').addEventListener('click', () => {
+      document.getElementById('modalTitle').textContent = 'Add Specialty';
+      ['editId', 'fName', 'fIcon', 'fDesc'].forEach(id => document.getElementById(id).value = '');
+      openModal('specModal');
+    });
+
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      const id = document.getElementById('editId').value;
+      const name = document.getElementById('fName').value.trim();
+      if (!name) { toast('Name is required.', 'error'); return; }
+      const data = { name, icon: document.getElementById('fIcon').value.trim() || 'fa-stethoscope', description: document.getElementById('fDesc').value.trim() };
+
+      if (id) { DB.update(DB_KEYS.specialties, id, data); addAuditLog(user.name, 'Updated specialty', 'Specialties'); toast('Specialty updated!', 'success'); }
+      else { DB.insert(DB_KEYS.specialties, { id: 'sp-' + Date.now(), ...data, doctorCount: 0, status: 'Active' }); addAuditLog(user.name, 'Created specialty', 'Specialties'); toast('Specialty created!', 'success'); }
+      closeModal('specModal');
+      render();
+    });
+
+    render();
+  }
+</script>
+</body>
+</html>

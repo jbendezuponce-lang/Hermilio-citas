@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Profile | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/dashboard.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div id="topbar-mount"></div>
+    <div class="content-area">
+      <div class="content-header"><div><h1>My Profile</h1><p>Update your account information.</p></div></div>
+      <div class="card" style="max-width:520px;">
+        <form id="profileForm" novalidate>
+          <div class="form-group"><label for="name">Full Name</label><input type="text" id="name"></div>
+          <div class="form-group"><label for="email">Email</label><input type="email" id="email"></div>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  const user = Auth.requireRole(['receptionist']);
+  if (user) {
+    renderPortalLayout('profile.html');
+    document.getElementById('name').value = user.name;
+    document.getElementById('email').value = user.email;
+    document.getElementById('profileForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      if (!name) { toast('Name is required.', 'error'); return; }
+      if (!isValidEmail(email)) { toast('Enter a valid email.', 'error'); return; }
+      DB.update(DB_KEYS.users, user.id, { name, email });
+      const session = Auth.currentUser(); session.name = name; session.email = email;
+      localStorage.setItem(DB_KEYS.session, JSON.stringify(session));
+      toast('Profile updated successfully!', 'success');
+      setTimeout(() => window.location.reload(), 700);
+    });
+  }
+</script>
+</body>
+</html>

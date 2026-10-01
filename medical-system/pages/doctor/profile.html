@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Profile | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/dashboard.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div id="topbar-mount"></div>
+    <div class="content-area">
+      <div class="content-header"><div><h1>My Profile</h1><p>Update your professional information.</p></div></div>
+      <div class="two-col">
+        <div class="card">
+          <form id="profileForm" novalidate>
+            <div class="form-group"><label for="name">Full Name <span class="req">*</span></label><input type="text" id="name"></div>
+            <div class="form-row">
+              <div class="form-group"><label for="phone">Phone</label><input type="tel" id="phone"></div>
+              <div class="form-group"><label for="email">Email <span class="req">*</span></label><input type="email" id="email"></div>
+            </div>
+            <div class="form-group"><label for="bio">Professional Biography</label><textarea id="bio"></textarea></div>
+            <div class="form-group"><label for="education">Education</label><input type="text" id="education"></div>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+          </form>
+        </div>
+        <div class="card text-center" style="height:fit-content;">
+          <img id="photo" class="avatar-lg" style="margin:0 auto 14px;width:120px;height:120px;" alt="">
+          <h4 id="dName"></h4>
+          <p class="text-muted" id="dSpec" style="font-size:.85rem;"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  const user = Auth.requireRole(['doctor']);
+  if (user) {
+    renderPortalLayout('profile.html');
+    const doctor = DB.find(DB_KEYS.doctors, user.doctorId);
+    const spec = DB.find(DB_KEYS.specialties, doctor.specialtyId);
+
+    document.getElementById('name').value = doctor.name;
+    document.getElementById('phone').value = doctor.phone;
+    document.getElementById('email').value = doctor.email;
+    document.getElementById('bio').value = doctor.bio;
+    document.getElementById('education').value = doctor.education;
+    document.getElementById('photo').src = doctor.photo;
+    document.getElementById('dName').textContent = doctor.name;
+    document.getElementById('dSpec').textContent = spec.name;
+
+    document.getElementById('profileForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      if (!name) { toast('Name is required.', 'error'); return; }
+      if (!isValidEmail(email)) { toast('Enter a valid email.', 'error'); return; }
+      DB.update(DB_KEYS.doctors, doctor.id, {
+        name, phone: document.getElementById('phone').value.trim(), email,
+        bio: document.getElementById('bio').value.trim(), education: document.getElementById('education').value.trim()
+      });
+      DB.update(DB_KEYS.users, user.id, { name, email });
+      const session = Auth.currentUser(); session.name = name; session.email = email;
+      localStorage.setItem(DB_KEYS.session, JSON.stringify(session));
+      toast('Profile updated successfully!', 'success');
+      setTimeout(() => window.location.reload(), 700);
+    });
+  }
+</script>
+</body>
+</html>

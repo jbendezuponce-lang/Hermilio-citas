@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/dashboard.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div id="topbar-mount"></div>
+    <div class="content-area">
+      <div class="content-header">
+        <div>
+          <h1 id="welcomeMsg">Welcome back!</h1>
+          <p>Here's what's happening with your health today.</p>
+        </div>
+        <a href="book-appointment.html" class="btn btn-primary"><i class="fa-solid fa-calendar-plus"></i> Book Appointment</a>
+      </div>
+
+      <div class="dashboard-grid" id="statsGrid"></div>
+
+      <div class="two-col">
+        <div>
+          <div class="card" style="margin-bottom:22px;">
+            <div class="flex justify-between items-center" style="margin-bottom:14px;">
+              <h4 style="margin:0;">Next Appointment</h4>
+              <a href="appointments.html" style="font-size:.85rem;font-weight:600;">View all</a>
+            </div>
+            <div id="nextApptBox"></div>
+          </div>
+
+          <div class="card">
+            <div class="flex justify-between items-center" style="margin-bottom:14px;">
+              <h4 style="margin:0;">Recent Appointments</h4>
+              <a href="appointments.html" style="font-size:.85rem;font-weight:600;">View all</a>
+            </div>
+            <div id="recentApptList"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="card" style="margin-bottom:22px;">
+            <div class="flex justify-between items-center" style="margin-bottom:14px;">
+              <h4 style="margin:0;">Notifications</h4>
+              <a href="notifications.html" style="font-size:.85rem;font-weight:600;">View all</a>
+            </div>
+            <div id="notifList"></div>
+          </div>
+
+          <div class="card">
+            <h4 style="margin-bottom:14px;">Quick Actions</h4>
+            <div class="flex" style="flex-direction:column;gap:10px;">
+              <a href="book-appointment.html" class="btn btn-outline btn-block"><i class="fa-solid fa-calendar-plus"></i> Book Appointment</a>
+              <a href="medical-history.html" class="btn btn-outline btn-block"><i class="fa-solid fa-file-waveform"></i> Medical History</a>
+              <a href="documents.html" class="btn btn-outline btn-block"><i class="fa-solid fa-folder-open"></i> Documents</a>
+              <a href="appointments.html" class="btn btn-outline btn-block"><i class="fa-solid fa-calendar-check"></i> My Appointments</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  const user = Auth.requireRole(['patient']);
+  if (user) {
+    renderPortalLayout('dashboard.html');
+    document.getElementById('welcomeMsg').textContent = 'Welcome back, ' + user.name.split(' ')[0] + '!';
+
+    const patientId = user.patientId;
+    const appts = DB.get(DB_KEYS.appointments).filter(a => a.patientId === patientId);
+    const doctors = DB.get(DB_KEYS.doctors);
+    const docMap = Object.fromEntries(doctors.map(d => [d.id, d]));
+    const specMap = Object.fromEntries(DB.get(DB_KEYS.specialties).map(s => [s.id, s.name]));
+    const docs = DB.get(DB_KEYS.documents).filter(d => d.patientId === patientId);
+    const consultations = DB.get(DB_KEYS.consultations).filter(c => c.patientId === patientId);
+
+    const upcoming = appts.filter(a => a.date >= today() && (a.status === 'Confirmed' || a.status === 'Pending')).sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+    const completed = appts.filter(a => a.status === 'Completed');
+    const pending = appts.filter(a => a.status === 'Pending');
+
+    document.getElementById('statsGrid').innerHTML = `
+      <div class="card stat-card"><div class="stat-icon blue"><i class="fa-solid fa-calendar-check"></i></div><div><div class="stat-value">${upcoming.length}</div><div class="stat-label">Upcoming Appointments</div></div></div>
+      <div class="card stat-card"><div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div><div><div class="stat-value">${completed.length}</div><div class="stat-label">Completed Appointments</div></div></div>
+      <div class="card stat-card"><div class="stat-icon teal"><i class="fa-solid fa-file-waveform"></i></div><div><div class="stat-value">${consultations.length}</div><div class="stat-label">Medical Records</div></div></div>
+      <div class="card stat-card"><div class="stat-icon amber"><i class="fa-solid fa-folder-open"></i></div><div><div class="stat-value">${docs.length}</div><div class="stat-label">Available Documents</div></div></div>`;
+
+    const next = upcoming[0];
+    const nextBox = document.getElementById('nextApptBox');
+    if (next) {
+      const doc = docMap[next.doctorId];
+      nextBox.innerHTML = `
+        <div class="flex items-center gap-16">
+          <img src="${doc.photo}" class="avatar" alt="Portrait of ${doc.name}">
+          <div style="flex:1;">
+            <strong>${doc.name}</strong>
+            <div class="text-muted" style="font-size:.85rem;">${specMap[doc.specialtyId]}</div>
+          </div>
+          ${statusBadge(next.status)}
+        </div>
+        <div class="flex gap-16" style="margin-top:14px;flex-wrap:wrap;font-size:.88rem;color:var(--color-text-muted);">
+          <span><i class="fa-solid fa-calendar-day"></i> ${formatDate(next.date)}</span>
+          <span><i class="fa-solid fa-clock"></i> ${next.time}</span>
+          <span><i class="fa-solid ${next.type === 'Virtual' ? 'fa-video' : 'fa-hospital'}"></i> ${next.type}</span>
+        </div>
+        <a href="appointment-details.html?id=${next.id}" class="btn btn-outline btn-sm" style="margin-top:14px;">View Details</a>`;
+    } else {
+      emptyState(nextBox, 'fa-calendar-xmark', 'No upcoming appointments', 'Book your next visit whenever you\'re ready.');
+    }
+
+    const recentList = document.getElementById('recentApptList');
+    const recent = [...appts].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
+    if (recent.length === 0) {
+      emptyState(recentList, 'fa-calendar', 'No appointments yet', 'Your appointment history will appear here.');
+    } else {
+      recentList.innerHTML = recent.map(a => {
+        const doc = docMap[a.doctorId];
+        return `<div class="flex items-center justify-between" style="padding:12px 0;border-bottom:1px solid var(--color-border);">
+          <div class="flex items-center gap-12">
+            <span class="avatar-sm">${initials(doc.name)}</span>
+            <div>
+              <div style="font-weight:600;font-size:.9rem;">${doc.name}</div>
+              <div class="text-muted" style="font-size:.8rem;">${formatDate(a.date)} · ${a.time}</div>
+            </div>
+          </div>
+          ${statusBadge(a.status)}
+        </div>`;
+      }).join('');
+    }
+
+    const notifs = DB.get(DB_KEYS.notifications).filter(n => n.userId === user.id).slice(0, 4);
+    const notifList = document.getElementById('notifList');
+    if (notifs.length === 0) {
+      emptyState(notifList, 'fa-bell-slash', 'No notifications', 'You\'re all caught up!');
+    } else {
+      notifList.innerHTML = notifs.map(n => `
+        <div style="padding:10px 0;border-bottom:1px solid var(--color-border);">
+          <div style="font-weight:600;font-size:.87rem;">${n.read ? '' : '<i class="fa-solid fa-circle" style="font-size:6px;color:var(--color-primary);margin-right:6px;"></i>'}${n.title}</div>
+          <div class="text-muted" style="font-size:.8rem;">${n.message}</div>
+        </div>`).join('');
+    }
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audit Logs | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/dashboard.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div id="topbar-mount"></div>
+    <div class="content-area">
+      <div class="content-header"><div><h1>Audit Logs</h1><p>System activity trail for compliance and troubleshooting.</p></div></div>
+
+      <div class="toolbar">
+        <div class="search-input"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="lSearch" placeholder="Search by user or action..."></div>
+        <select class="filter-select" id="lModule"><option value="">All Modules</option></select>
+        <input type="date" id="lFrom" class="filter-select">
+        <input type="date" id="lTo" class="filter-select">
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>User</th><th>Action</th><th>Module</th><th>Date</th><th>Time</th><th>Status</th></tr></thead>
+          <tbody id="lBody"></tbody>
+        </table>
+      </div>
+      <div id="lEmpty"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  const user = Auth.requireRole(['admin']);
+  if (user) {
+    renderPortalLayout('audit-logs.html');
+    const logs = DB.get(DB_KEYS.auditLogs);
+    const modules = [...new Set(logs.map(l => l.module))];
+    document.getElementById('lModule').innerHTML += modules.map(m => `<option value="${m}">${m}</option>`).join('');
+
+    function render() {
+      const term = document.getElementById('lSearch').value.toLowerCase().trim();
+      const module = document.getElementById('lModule').value;
+      const from = document.getElementById('lFrom').value;
+      const to = document.getElementById('lTo').value;
+
+      const list = DB.get(DB_KEYS.auditLogs)
+        .filter(l => !module || l.module === module)
+        .filter(l => !from || l.date >= from)
+        .filter(l => !to || l.date <= to)
+        .filter(l => !term || l.user.toLowerCase().includes(term) || l.action.toLowerCase().includes(term))
+        .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+
+      const body = document.getElementById('lBody');
+      const empty = document.getElementById('lEmpty');
+      if (list.length === 0) { body.innerHTML = ''; emptyState(empty, 'fa-list-check', 'No log entries found', 'Try adjusting your filters.'); return; }
+      empty.innerHTML = '';
+      body.innerHTML = list.map(l => `
+        <tr>
+          <td>${l.user}</td>
+          <td>${l.action}</td>
+          <td><span class="badge badge-gray">${l.module}</span></td>
+          <td>${formatDate(l.date)}</td>
+          <td>${l.time}</td>
+          <td>${statusBadge(l.status)}</td>
+        </tr>`).join('');
+    }
+
+    ['lSearch', 'lModule', 'lFrom', 'lTo'].forEach(id => {
+      document.getElementById(id).addEventListener('input', debounce(render, 150));
+      document.getElementById(id).addEventListener('change', render);
+    });
+    render();
+  }
+</script>
+</body>
+</html>

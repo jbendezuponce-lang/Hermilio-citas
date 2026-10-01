@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/dashboard.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div id="topbar-mount"></div>
+    <div class="content-area">
+      <div class="content-header"><div><h1>Settings</h1><p>Manage your account preferences and security.</p></div></div>
+
+      <div class="card" style="max-width:640px;margin-bottom:22px;">
+        <h4>Change Password</h4>
+        <form id="pwForm" novalidate>
+          <div class="form-group"><label for="currentPw">Current Password</label><input type="password" id="currentPw"></div>
+          <div class="form-group"><label for="newPw">New Password</label><input type="password" id="newPw"></div>
+          <div class="form-group"><label for="confirmPw">Confirm New Password</label><input type="password" id="confirmPw"></div>
+          <button type="submit" class="btn btn-primary">Update Password</button>
+        </form>
+      </div>
+
+      <div class="card" style="max-width:640px;margin-bottom:22px;">
+        <h4>Notification Preferences</h4>
+        <div class="checkbox-row" style="margin-bottom:14px;"><input type="checkbox" id="emailNotif" checked><label for="emailNotif">Email notifications</label></div>
+        <div class="checkbox-row" style="margin-bottom:14px;"><input type="checkbox" id="reminderNotif" checked><label for="reminderNotif">Appointment reminders</label></div>
+        <div class="checkbox-row"><input type="checkbox" id="smsNotif"><label for="smsNotif">SMS notifications</label></div>
+      </div>
+
+      <div class="card" style="max-width:640px;margin-bottom:22px;">
+        <h4>Privacy Settings</h4>
+        <div class="checkbox-row" style="margin-bottom:14px;"><input type="checkbox" id="shareData" checked><label for="shareData">Allow doctors to view my full medical history</label></div>
+        <div class="checkbox-row"><input type="checkbox" id="marketing"><label for="marketing">Receive marketing communications</label></div>
+      </div>
+
+      <div class="card" style="max-width:640px;">
+        <h4>Session Settings</h4>
+        <p>You are currently logged in on this device.</p>
+        <button class="btn btn-outline" id="logoutAllBtn"><i class="fa-solid fa-right-from-bracket"></i> Log out of all devices</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  const user = Auth.requireRole(['patient']);
+  if (user) {
+    renderPortalLayout('settings.html');
+
+    document.getElementById('pwForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const current = document.getElementById('currentPw').value;
+      const next = document.getElementById('newPw').value;
+      const confirm = document.getElementById('confirmPw').value;
+      const dbUser = DB.find(DB_KEYS.users, user.id);
+      if (current !== dbUser.password) { toast('Current password is incorrect.', 'error'); return; }
+      if (passwordStrength(next) < 2) { toast('New password is too weak.', 'error'); return; }
+      if (next !== confirm) { toast('Passwords do not match.', 'error'); return; }
+      DB.update(DB_KEYS.users, user.id, { password: next });
+      toast('Password updated successfully!', 'success');
+      e.target.reset();
+    });
+
+    qsa('.checkbox-row input').forEach(cb => cb.addEventListener('change', () => toast('Preference saved.', 'success', 1500)));
+
+    document.getElementById('logoutAllBtn').addEventListener('click', () => {
+      confirmDialog('This will log you out of all devices. Continue?', () => {
+        Auth.logout();
+        window.location.href = '../../index.html';
+      });
+    });
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Appointment Details | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/dashboard.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div id="topbar-mount"></div>
+    <div class="content-area">
+      <div class="breadcrumbs">
+        <a href="appointments.html">My Appointments</a><span class="sep">/</span><span class="current">Details</span>
+      </div>
+      <div id="detailsWrap"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  const user = Auth.requireRole(['patient']);
+  if (user) {
+    renderPortalLayout('appointments.html');
+    const id = new URLSearchParams(window.location.search).get('id');
+    const appt = DB.find(DB_KEYS.appointments, id);
+    const wrap = document.getElementById('detailsWrap');
+
+    if (!appt || appt.patientId !== user.patientId) {
+      emptyState(wrap, 'fa-calendar-xmark', 'Appointment not found', 'This appointment does not exist or is not yours.');
+    } else {
+      const doc = DB.find(DB_KEYS.doctors, appt.doctorId);
+      const spec = DB.find(DB_KEYS.specialties, appt.specialtyId);
+      const loc = DB.find(DB_KEYS.locations, appt.locationId);
+
+      wrap.innerHTML = `
+        <div class="card" style="max-width:720px;">
+          <div class="flex justify-between items-start" style="margin-bottom:20px;">
+            <div>
+              <h2 style="margin-bottom:4px;">Appointment ${appt.id}</h2>
+              <p class="text-muted" style="margin:0;">Booked on ${formatDate(appt.createdAt)}</p>
+            </div>
+            ${statusBadge(appt.status)}
+          </div>
+          <div class="flex items-center gap-12" style="margin-bottom:20px;">
+            <img src="${doc.photo}" class="avatar" style="width:56px;height:56px;" alt="Portrait of ${doc.name}">
+            <div><strong>${doc.name}</strong><div class="text-muted" style="font-size:.85rem;">${spec.name}</div></div>
+          </div>
+          <table class="data-table" style="min-width:0;">
+            <tbody>
+              <tr><td style="font-weight:600;width:180px;">Date</td><td>${formatDateLong(appt.date)}</td></tr>
+              <tr><td style="font-weight:600;">Time</td><td>${appt.time}</td></tr>
+              <tr><td style="font-weight:600;">Consultation Type</td><td>${appt.type}</td></tr>
+              <tr><td style="font-weight:600;">Location</td><td>${loc.name}, ${loc.address}</td></tr>
+              <tr><td style="font-weight:600;">Reason</td><td>${appt.reason}</td></tr>
+            </tbody>
+          </table>
+          <div class="flex gap-12" style="margin-top:24px;flex-wrap:wrap;">
+            ${(appt.status === 'Confirmed' || appt.status === 'Pending') ? `
+              <a href="reschedule.html?id=${appt.id}" class="btn btn-outline"><i class="fa-solid fa-calendar-days"></i> Reschedule</a>
+              <button class="btn btn-danger" id="cancelBtn"><i class="fa-solid fa-xmark"></i> Cancel Appointment</button>` : ''}
+            <button class="btn btn-ghost" id="printBtn"><i class="fa-solid fa-print"></i> Print / Download Confirmation</button>
+          </div>
+        </div>`;
+
+      document.getElementById('cancelBtn')?.addEventListener('click', () => {
+        confirmDialog('Are you sure you want to cancel this appointment?', () => {
+          DB.update(DB_KEYS.appointments, appt.id, { status: 'Cancelled' });
+          addNotification(user.id, 'Appointment cancelled', `Your appointment ${appt.id} has been cancelled.`, 'appointment');
+          addAuditLog(user.name, 'Cancelled appointment', 'Appointments');
+          toast('Appointment cancelled.', 'success');
+          setTimeout(() => window.location.reload(), 700);
+        }, { danger: true, confirmText: 'Cancel Appointment' });
+      });
+
+      document.getElementById('printBtn')?.addEventListener('click', () => window.print());
+    }
+  }
+</script>
+</body>
+</html>

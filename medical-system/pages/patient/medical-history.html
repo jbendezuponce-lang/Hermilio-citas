@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medical History | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/dashboard.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div id="topbar-mount"></div>
+    <div class="content-area">
+      <div class="content-header"><div><h1>Medical History</h1><p>A complete timeline of your consultations and treatments.</p></div></div>
+
+      <div class="toolbar">
+        <select class="filter-select" id="filterSpec"><option value="">All Specialties</option></select>
+        <select class="filter-select" id="filterDoc"><option value="">All Doctors</option></select>
+        <input type="date" id="filterDate" class="filter-select">
+      </div>
+
+      <div class="card">
+        <div class="timeline" id="historyTimeline"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  const user = Auth.requireRole(['patient']);
+  if (user) {
+    renderPortalLayout('medical-history.html');
+    const specialties = DB.get(DB_KEYS.specialties);
+    const doctors = Object.fromEntries(DB.get(DB_KEYS.doctors).map(d => [d.id, d]));
+    const specMap = Object.fromEntries(specialties.map(s => [s.id, s.name]));
+
+    document.getElementById('filterSpec').innerHTML += specialties.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    document.getElementById('filterDoc').innerHTML += DB.get(DB_KEYS.doctors).map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+
+    function render() {
+      const spec = document.getElementById('filterSpec').value;
+      const doc = document.getElementById('filterDoc').value;
+      const date = document.getElementById('filterDate').value;
+
+      const consultations = DB.get(DB_KEYS.consultations)
+        .filter(c => c.patientId === user.patientId)
+        .filter(c => !spec || c.specialtyId === spec)
+        .filter(c => !doc || c.doctorId === doc)
+        .filter(c => !date || c.date === date)
+        .sort((a, b) => b.date.localeCompare(a.date));
+
+      const timeline = document.getElementById('historyTimeline');
+      if (consultations.length === 0) {
+        emptyState(timeline, 'fa-file-waveform', 'No medical records found', 'Records will appear here after a completed consultation.');
+        return;
+      }
+      timeline.innerHTML = consultations.map(c => {
+        const d = doctors[c.doctorId];
+        return `<div class="timeline-item">
+          <div class="timeline-date">${formatDateLong(c.date)}</div>
+          <h4 style="margin:6px 0 4px;">${c.diagnosis}</h4>
+          <p style="margin-bottom:8px;">${d.name} · ${specMap[c.specialtyId]}</p>
+          <p style="margin-bottom:10px;font-size:.88rem;"><strong>Treatment:</strong> ${c.treatment}</p>
+          <a href="consultation-details.html?id=${c.id}" class="btn btn-outline btn-sm">View Full Details</a>
+        </div>`;
+      }).join('');
+    }
+
+    ['filterSpec', 'filterDoc', 'filterDate'].forEach(id => document.getElementById(id).addEventListener('change', render));
+    render();
+  }
+</script>
+</body>
+</html>

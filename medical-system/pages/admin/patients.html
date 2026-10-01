@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Patient Management | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/dashboard.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div id="topbar-mount"></div>
+    <div class="content-area">
+      <div class="content-header"><div><h1>Patient Management</h1><p>View and manage all registered patients.</p></div></div>
+
+      <div class="toolbar">
+        <div class="search-input"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="pSearch" placeholder="Search by name, National ID..."></div>
+        <select class="filter-select" id="pStatus"><option value="">All Statuses</option><option>Active</option><option>Inactive</option></select>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Patient ID</th><th>Name</th><th>National ID</th><th>Phone</th><th>Registered</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="pBody"></tbody>
+        </table>
+      </div>
+      <div id="pEmpty"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  const user = Auth.requireRole(['admin']);
+  if (user) {
+    renderPortalLayout('patients.html');
+
+    function render() {
+      const term = document.getElementById('pSearch').value.toLowerCase().trim();
+      const status = document.getElementById('pStatus').value;
+      const list = DB.get(DB_KEYS.patients)
+        .filter(p => !status || p.status === status)
+        .filter(p => !term || p.name.toLowerCase().includes(term) || p.nationalId.includes(term));
+
+      const body = document.getElementById('pBody');
+      const empty = document.getElementById('pEmpty');
+      if (list.length === 0) { body.innerHTML = ''; emptyState(empty, 'fa-users', 'No patients found', 'Try a different search or filter.'); return; }
+      empty.innerHTML = '';
+      body.innerHTML = list.map(p => `
+        <tr>
+          <td>${p.id}</td>
+          <td><div class="flex items-center gap-12"><img src="${p.photo}" class="avatar" style="width:30px;height:30px;" alt=""><span>${p.name}</span></div></td>
+          <td>${p.nationalId}</td>
+          <td>${p.phone}</td>
+          <td>${formatDate(p.registered)}</td>
+          <td>${statusBadge(p.status)}</td>
+          <td class="table-actions">
+            <button class="btn btn-outline btn-sm toggle-btn" data-id="${p.id}">${p.status === 'Active' ? 'Deactivate' : 'Activate'}</button>
+          </td>
+        </tr>`).join('');
+
+      qsa('.toggle-btn').forEach(b => b.addEventListener('click', () => {
+        const p = DB.find(DB_KEYS.patients, b.dataset.id);
+        const newStatus = p.status === 'Active' ? 'Inactive' : 'Active';
+        DB.update(DB_KEYS.patients, p.id, { status: newStatus });
+        addAuditLog(user.name, (newStatus === 'Active' ? 'Activated' : 'Deactivated') + ' patient', 'Patients');
+        toast(`Patient ${newStatus === 'Active' ? 'activated' : 'deactivated'}.`, 'success');
+        render();
+      }));
+    }
+
+    ['pSearch', 'pStatus'].forEach(id => {
+      document.getElementById(id).addEventListener('input', debounce(render, 150));
+      document.getElementById(id).addEventListener('change', render);
+    });
+    render();
+  }
+</script>
+</body>
+</html>

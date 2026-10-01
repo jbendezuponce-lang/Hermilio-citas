@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MediCare+ | Modern Healthcare Management Platform</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/forms.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+
+<div id="public-navbar-mount"></div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <div>
+      <span class="eyebrow">Trusted healthcare platform</span>
+      <h1>Your health, <span style="color:var(--color-primary)">organized</span> and always within reach.</h1>
+      <p class="lead">Book appointments, manage your medical history and connect with top doctors — all in one modern, secure platform built for patients and clinics alike.</p>
+      <div class="hero-ctas">
+        <a href="pages/auth/register.html" class="btn btn-primary btn-lg"><i class="fa-solid fa-calendar-check"></i> Book an Appointment</a>
+        <a href="pages/public/doctors.html" class="btn btn-outline btn-lg"><i class="fa-solid fa-user-doctor"></i> Find a Doctor</a>
+      </div>
+      <div class="flex gap-16" style="margin-top:36px;flex-wrap:wrap;">
+        <div><strong style="font-size:1.4rem;">120+</strong><div class="text-muted" style="font-size:.85rem;">Specialist doctors</div></div>
+        <div><strong style="font-size:1.4rem;">45k+</strong><div class="text-muted" style="font-size:.85rem;">Patients served</div></div>
+        <div><strong style="font-size:1.4rem;">4.9/5</strong><div class="text-muted" style="font-size:.85rem;">Average rating</div></div>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <img src="https://images.unsplash.com/photo-1631217868264-e5b90bb7e133?q=80&w=1200&auto=format&fit=crop" alt="Doctor consulting with a patient in a modern clinic">
+    </div>
+  </div>
+</section>
+
+<!-- BENEFITS -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <span class="eyebrow">Why MediCare+</span>
+      <h2>Everything your care team needs, in one place</h2>
+      <p>A single platform connecting patients, doctors, receptionists and administrators for seamless, coordinated care.</p>
+    </div>
+    <div class="grid grid-4">
+      <div class="card card-hover text-center">
+        <div class="spec-icon" style="margin:0 auto 14px;"><i class="fa-solid fa-calendar-check"></i></div>
+        <h4>Easy Booking</h4>
+        <p>Book appointments in a few clicks with real-time doctor availability.</p>
+      </div>
+      <div class="card card-hover text-center">
+        <div class="spec-icon" style="margin:0 auto 14px;"><i class="fa-solid fa-file-waveform"></i></div>
+        <h4>Full Medical History</h4>
+        <p>Access your consultations, diagnoses and prescriptions anytime.</p>
+      </div>
+      <div class="card card-hover text-center">
+        <div class="spec-icon" style="margin:0 auto 14px;"><i class="fa-solid fa-video"></i></div>
+        <h4>In-person or Virtual</h4>
+        <p>Choose the consultation type that fits your schedule and needs.</p>
+      </div>
+      <div class="card card-hover text-center">
+        <div class="spec-icon" style="margin:0 auto 14px;"><i class="fa-solid fa-bell"></i></div>
+        <h4>Smart Reminders</h4>
+        <p>Never miss a visit with automatic notifications and reminders.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SPECIALTIES -->
+<section class="section" style="background:var(--color-surface);border-top:1px solid var(--color-border);border-bottom:1px solid var(--color-border);">
+  <div class="container">
+    <div class="section-header">
+      <span class="eyebrow">Medical Specialties</span>
+      <h2>Care across every specialty</h2>
+      <p>From routine checkups to specialized treatment, find the right expert for you.</p>
+    </div>
+    <div class="grid grid-4" id="homeSpecialtiesGrid"></div>
+    <div class="text-center" style="margin-top:30px;">
+      <a href="pages/public/specialties.html" class="btn btn-outline">View All Specialties <i class="fa-solid fa-arrow-right"></i></a>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURED DOCTORS -->
+<section class="section">
+  <div class="container">
+    <div class="section-header">
+      <span class="eyebrow">Our Doctors</span>
+      <h2>Meet our featured specialists</h2>
+      <p>Experienced, board-certified doctors dedicated to your wellbeing.</p>
+    </div>
+    <div class="grid grid-4" id="homeDoctorsGrid"></div>
+    <div class="text-center" style="margin-top:30px;">
+      <a href="pages/public/doctors.html" class="btn btn-outline">View All Doctors <i class="fa-solid fa-arrow-right"></i></a>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section" style="background:var(--color-primary-light);">
+  <div class="container">
+    <div class="section-header">
+      <span class="eyebrow">How It Works</span>
+      <h2>Book your appointment in 4 simple steps</h2>
+    </div>
+    <div class="grid grid-4">
+      <div class="card text-center"><div class="spec-icon" style="margin:0 auto 14px;"><i class="fa-solid fa-user-plus"></i></div><h4>1. Create Account</h4><p>Sign up in under a minute with your basic details.</p></div>
+      <div class="card text-center"><div class="spec-icon" style="margin:0 auto 14px;"><i class="fa-solid fa-magnifying-glass"></i></div><h4>2. Find a Doctor</h4><p>Search by specialty, availability, or location.</p></div>
+      <div class="card text-center"><div class="spec-icon" style="margin:0 auto 14px;"><i class="fa-solid fa-calendar-days"></i></div><h4>3. Pick a Time</h4><p>Choose a date and time that works for you.</p></div>
+      <div class="card text-center"><div class="spec-icon" style="margin:0 auto 14px;"><i class="fa-solid fa-circle-check"></i></div><h4>4. Get Confirmed</h4><p>Receive instant confirmation and reminders.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section class="section">
+  <div class="container">
+    <div class="grid grid-4">
+      <div class="card text-center"><div class="stat-value" style="color:var(--color-primary);">120+</div><div class="stat-label">Specialist Doctors</div></div>
+      <div class="card text-center"><div class="stat-value" style="color:var(--color-primary);">45,000+</div><div class="stat-label">Patients Served</div></div>
+      <div class="card text-center"><div class="stat-value" style="color:var(--color-primary);">10</div><div class="stat-label">Medical Specialties</div></div>
+      <div class="card text-center"><div class="stat-value" style="color:var(--color-primary);">98%</div><div class="stat-label">Patient Satisfaction</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="section" style="background:var(--color-surface);border-top:1px solid var(--color-border);border-bottom:1px solid var(--color-border);">
+  <div class="container">
+    <div class="section-header">
+      <span class="eyebrow">Testimonials</span>
+      <h2>What our patients say</h2>
+    </div>
+    <div class="grid grid-3">
+      <div class="card testimonial-card">
+        <div class="stars"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i></div>
+        <p>"Booking an appointment used to take forever. Now I do it in two minutes between meetings."</p>
+        <div class="testimonial-person"><span class="avatar-sm">JC</span><div><strong>John Carter</strong><span>Patient</span></div></div>
+      </div>
+      <div class="card testimonial-card">
+        <div class="stars"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i></div>
+        <p>"Having my full medical history in one place makes every follow-up visit so much smoother."</p>
+        <div class="testimonial-person"><span class="avatar-sm">ML</span><div><strong>Maria Lopez</strong><span>Patient</span></div></div>
+      </div>
+      <div class="card testimonial-card">
+        <div class="stars"><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star-half-stroke"></i></div>
+        <p>"The reminders alone have cut our no-show rate significantly at the clinic."</p>
+        <div class="testimonial-person"><span class="avatar-sm">JB</span><div><strong>Jordan Blake</strong><span>Receptionist</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ PREVIEW -->
+<section class="section">
+  <div class="container" style="max-width:800px;">
+    <div class="section-header">
+      <span class="eyebrow">FAQ</span>
+      <h2>Common questions</h2>
+    </div>
+    <div id="homeFaq"></div>
+    <div class="text-center" style="margin-top:20px;">
+      <a href="pages/help/faq.html" class="btn btn-outline">View Full FAQ</a>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT CTA -->
+<section class="section" style="background:var(--color-primary);color:#fff;">
+  <div class="container text-center">
+    <h2 style="color:#fff;">Ready to take control of your healthcare?</h2>
+    <p style="color:rgba(255,255,255,.85);max-width:520px;margin:0 auto 26px;">Join thousands of patients managing appointments and medical records with MediCare+.</p>
+    <div class="hero-ctas" style="justify-content:center;">
+      <a href="pages/auth/register.html" class="btn btn-lg" style="background:#fff;color:var(--color-primary);">Create Free Account</a>
+      <a href="pages/public/contact.html" class="btn btn-outline btn-lg" style="border-color:#fff;color:#fff;">Contact Us</a>
+    </div>
+  </div>
+</section>
+
+<div id="footer-mount"></div>
+
+<script src="js/data.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/navigation.js"></script>
+<script>
+  renderPublicNavbar('home');
+  renderFooter();
+
+  const specialties = DB.get(DB_KEYS.specialties).slice(0, 4);
+  document.getElementById('homeSpecialtiesGrid').innerHTML = specialties.map(s => `
+    <div class="card card-hover specialty-card">
+      <div class="spec-icon"><i class="fa-solid ${s.icon}"></i></div>
+      <h4>${s.name}</h4>
+      <p style="font-size:.85rem;">${s.description}</p>
+      <div class="count">${s.doctorCount} doctors available</div>
+      <a href="pages/public/doctors.html?specialty=${s.id}" class="btn btn-outline btn-sm btn-block">View Doctors</a>
+    </div>`).join('');
+
+  const doctors = DB.get(DB_KEYS.doctors).slice(0, 4);
+  const specMap = Object.fromEntries(DB.get(DB_KEYS.specialties).map(s => [s.id, s.name]));
+  document.getElementById('homeDoctorsGrid').innerHTML = doctors.map(d => `
+    <div class="card card-hover doctor-card">
+      <img src="${d.photo}" alt="Portrait of ${d.name}" class="doc-photo">
+      <div class="doc-body">
+        <div class="doc-name">${d.name}</div>
+        <div class="doc-spec">${specMap[d.specialtyId]}</div>
+        <div class="doc-meta">
+          <span><i class="fa-solid fa-star rating-stars"></i> ${d.rating}</span>
+          <span><i class="fa-solid fa-briefcase-medical"></i> ${d.experience} yrs</span>
+        </div>
+        <div class="doc-actions">
+          <a href="pages/public/doctor-profile.html?id=${d.id}" class="btn btn-outline btn-sm btn-block">View Profile</a>
+        </div>
+      </div>
+    </div>`).join('');
+
+  const faqs = [
+    { q: 'Is MediCare+ free to use for patients?', a: 'Yes, creating a patient account and booking appointments is completely free.' },
+    { q: 'Can I cancel or reschedule an appointment?', a: 'Absolutely — from "My Appointments" you can cancel or reschedule any upcoming visit.' },
+    { q: 'Are virtual consultations available?', a: 'Many of our doctors offer virtual consultations in addition to in-person visits.' }
+  ];
+  document.getElementById('homeFaq').innerHTML = faqs.map((f, i) => `
+    <div class="faq-item ${i === 0 ? 'open' : ''}">
+      <div class="faq-question">${f.q} <i class="fa-solid fa-chevron-down"></i></div>
+      <div class="faq-answer">${f.a}</div>
+    </div>`).join('');
+  qsa('.faq-question').forEach(q => q.addEventListener('click', () => q.parentElement.classList.toggle('open')));
+</script>
+</body>
+</html>

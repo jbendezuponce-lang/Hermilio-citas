@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Book Appointment | MediCare+</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../css/style.css">
+<link rel="stylesheet" href="../../css/components.css">
+<link rel="stylesheet" href="../../css/forms.css">
+<link rel="stylesheet" href="../../css/dashboard.css">
+<link rel="stylesheet" href="../../css/responsive.css">
+</head>
+<body>
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div id="topbar-mount"></div>
+    <div class="content-area">
+      <div class="content-header">
+        <div>
+          <h1>Book an Appointment</h1>
+          <p>Follow the steps below to schedule your visit.</p>
+        </div>
+      </div>
+
+      <div class="card" style="max-width:900px;">
+        <div class="steps" id="stepsBar"></div>
+
+        <!-- STEP 1: Specialty -->
+        <div class="wizard-step" data-step="1">
+          <h3>Select a Specialty</h3>
+          <div class="grid grid-4" id="specialtyOptions"></div>
+        </div>
+
+        <!-- STEP 2: Doctor -->
+        <div class="wizard-step" data-step="2" style="display:none;">
+          <h3>Select a Doctor</h3>
+          <div class="grid grid-3" id="doctorOptions"></div>
+        </div>
+
+        <!-- STEP 3: Date -->
+        <div class="wizard-step" data-step="3" style="display:none;">
+          <h3>Select a Date</h3>
+          <div class="form-group" style="max-width:280px;">
+            <label for="apptDate">Appointment Date</label>
+            <input type="date" id="apptDate">
+          </div>
+          <p class="form-hint" id="dateHint"></p>
+        </div>
+
+        <!-- STEP 4: Time -->
+        <div class="wizard-step" data-step="4" style="display:none;">
+          <h3>Select an Available Time</h3>
+          <div class="slot-grid" id="timeSlots"></div>
+        </div>
+
+        <!-- STEP 5: Type -->
+        <div class="wizard-step" data-step="5" style="display:none;">
+          <h3>Consultation Type</h3>
+          <div class="grid grid-2" id="typeOptions" style="max-width:480px;"></div>
+        </div>
+
+        <!-- STEP 6: Reason -->
+        <div class="wizard-step" data-step="6" style="display:none;">
+          <h3>Reason for Appointment</h3>
+          <div class="form-group">
+            <label for="apptReason">Describe your reason for visit <span class="req">*</span></label>
+            <textarea id="apptReason" placeholder="e.g. Follow-up on blood pressure medication..."></textarea>
+          </div>
+        </div>
+
+        <!-- STEP 7: Review -->
+        <div class="wizard-step" data-step="7" style="display:none;">
+          <h3>Review Your Appointment</h3>
+          <div id="reviewBox"></div>
+        </div>
+
+        <!-- STEP 8: Confirmation -->
+        <div class="wizard-step" data-step="8" style="display:none;">
+          <div class="text-center" style="padding:20px 0;">
+            <div class="spec-icon" style="margin:0 auto 16px;background:#dcfce7;color:var(--color-success);width:74px;height:74px;font-size:1.9rem;"><i class="fa-solid fa-check"></i></div>
+            <h3>Appointment Confirmed!</h3>
+            <p>Your appointment ID is <strong id="confirmId"></strong>. A confirmation has been sent and it now appears in your appointment list.</p>
+            <div class="flex gap-12" style="justify-content:center;margin-top:20px;">
+              <a href="appointments.html" class="btn btn-primary">View My Appointments</a>
+              <a href="dashboard.html" class="btn btn-outline">Back to Dashboard</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-between" style="margin-top:28px;" id="wizardNav">
+          <button class="btn btn-ghost" id="btnBack"><i class="fa-solid fa-arrow-left"></i> Back</button>
+          <button class="btn btn-primary" id="btnNext">Next <i class="fa-solid fa-arrow-right"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/utils.js"></script>
+<script src="../../js/navigation.js"></script>
+<script>
+  const user = Auth.requireRole(['patient']);
+  if (user) {
+    renderPortalLayout('book-appointment.html');
+
+    const STEP_LABELS = ['Specialty', 'Doctor', 'Date', 'Time', 'Type', 'Reason', 'Review', 'Confirm'];
+    let currentStep = 1;
+    const state = { specialtyId: null, doctorId: null, date: null, time: null, type: null, reason: '' };
+
+    const specialties = DB.get(DB_KEYS.specialties);
+    const doctors = DB.get(DB_KEYS.doctors);
+    const locations = DB.get(DB_KEYS.locations);
+    const specMap = Object.fromEntries(specialties.map(s => [s.id, s.name]));
+    const locMap = Object.fromEntries(locations.map(l => [l.id, l.name]));
+
+    function renderSteps() {
+      document.getElementById('stepsBar').innerHTML = STEP_LABELS.map((label, i) => {
+        const n = i + 1;
+        const cls = n < currentStep ? 'done' : (n === currentStep ? 'active' : '');
+        return `<div class="step ${cls}"><div class="step-circle">${n < currentStep ? '<i class=\"fa-solid fa-check\"></i>' : n}</div><div class="step-label">${label}</div></div>`;
+      }).join('');
+    }
+
+    function goToStep(n) {
+      currentStep = n;
+      qsa('.wizard-step').forEach(s => s.style.display = parseInt(s.dataset.step) === n ? 'block' : 'none');
+      renderSteps();
+      document.getElementById('wizardNav').style.display = n === 8 ? 'none' : 'flex';
+      document.getElementById('btnBack').style.visibility = n === 1 ? 'hidden' : 'visible';
+      document.getElementById('btnNext').innerHTML = n === 7 ? 'Confirm Appointment <i class="fa-solid fa-check"></i>' : 'Next <i class="fa-solid fa-arrow-right"></i>';
+      if (n === 2) renderDoctorOptions();
+      if (n === 3) initDatePicker();
+      if (n === 4) renderTimeSlots();
+      if (n === 7) renderReview();
+    }
+
+    // Step 1: specialty
+    document.getElementById('specialtyOptions').innerHTML = specialties.map(s => `
+      <div class="option-card" data-id="${s.id}">
+        <i class="fa-solid ${s.icon}"></i>
+        <div style="font-weight:700;font-size:.9rem;">${s.name}</div>
+      </div>`).join('');
+    qsa('#specialtyOptions .option-card').forEach(card => {
+      card.addEventListener('click', () => {
+        qsa('#specialtyOptions .option-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        state.specialtyId = card.dataset.id;
+        state.doctorId = null;
+      });
+    });
+
+    function renderDoctorOptions() {
+      const filtered = doctors.filter(d => d.specialtyId === state.specialtyId);
+      const box = document.getElementById('doctorOptions');
+      if (filtered.length === 0) { emptyState(box, 'fa-user-doctor', 'No doctors available', 'Please choose a different specialty.'); return; }
+      box.innerHTML = filtered.map(d => `
+        <div class="option-card" data-id="${d.id}" style="text-align:left;">
+          <div class="flex items-center gap-12">
+            <img src="${d.photo}" class="avatar" alt="Portrait of ${d.name}">
+            <div>
+              <div style="font-weight:700;font-size:.92rem;">${d.name}</div>
+              <div class="text-muted" style="font-size:.8rem;"><i class="fa-solid fa-star rating-stars"></i> ${d.rating} · ${d.experience} yrs</div>
+            </div>
+          </div>
+        </div>`).join('');
+      qsa('#doctorOptions .option-card').forEach(card => {
+        if (card.dataset.id === state.doctorId) card.classList.add('selected');
+        card.addEventListener('click', () => {
+          qsa('#doctorOptions .option-card').forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+          state.doctorId = card.dataset.id;
+        });
+      });
+    }
+
+    function initDatePicker() {
+      const input = document.getElementById('apptDate');
+      input.min = today();
+      input.value = state.date || '';
+      input.oninput = () => { state.date = input.value; state.time = null; };
+      document.getElementById('dateHint').textContent = 'Appointments can be booked starting today.';
+    }
+
+    function renderTimeSlots() {
+      const allSlots = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'];
+      const taken = DB.get(DB_KEYS.appointments)
+        .filter(a => a.doctorId === state.doctorId && a.date === state.date && a.status !== 'Cancelled')
+        .map(a => a.time);
+      const box = document.getElementById('timeSlots');
+      box.innerHTML = allSlots.map(t => `
+        <button type="button" class="slot-btn ${state.time === t ? 'selected' : ''}" data-time="${t}" ${taken.includes(t) ? 'disabled' : ''}>${t}</button>`).join('');
+      qsa('#timeSlots .slot-btn:not(:disabled)').forEach(btn => {
+        btn.addEventListener('click', () => {
+          qsa('#timeSlots .slot-btn').forEach(b => b.classList.remove('selected'));
+          btn.classList.add('selected');
+          state.time = btn.dataset.time;
+        });
+      });
+    }
+
+    // Step 5: type
+    function renderTypeOptions() {
+      const doc = doctors.find(d => d.id === state.doctorId);
+      const types = doc ? doc.consultationTypes : ['In person', 'Virtual'];
+      document.getElementById('typeOptions').innerHTML = types.map(t => `
+        <div class="option-card" data-type="${t}">
+          <i class="fa-solid ${t === 'Virtual' ? 'fa-video' : 'fa-hospital'}"></i>
+          <div style="font-weight:700;font-size:.9rem;">${t}</div>
+        </div>`).join('');
+      qsa('#typeOptions .option-card').forEach(card => {
+        if (card.dataset.type === state.type) card.classList.add('selected');
+        card.addEventListener('click', () => {
+          qsa('#typeOptions .option-card').forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+          state.type = card.dataset.type;
+        });
+      });
+    }
+
+    function renderReview() {
+      const doc = doctors.find(d => d.id === state.doctorId);
+      document.getElementById('reviewBox').innerHTML = `
+        <div class="card" style="background:var(--color-bg);">
+          <div class="flex items-center gap-12" style="margin-bottom:16px;">
+            <img src="${doc.photo}" class="avatar" alt="Portrait of ${doc.name}">
+            <div><strong>${doc.name}</strong><div class="text-muted" style="font-size:.85rem;">${specMap[doc.specialtyId]}</div></div>
+          </div>
+          <table class="data-table" style="min-width:0;">
+            <tbody>
+              <tr><td style="font-weight:600;">Date</td><td>${formatDateLong(state.date)}</td></tr>
+              <tr><td style="font-weight:600;">Time</td><td>${state.time}</td></tr>
+              <tr><td style="font-weight:600;">Consultation Type</td><td>${state.type}</td></tr>
+              <tr><td style="font-weight:600;">Location</td><td>${locMap[doc.locationId]}</td></tr>
+              <tr><td style="font-weight:600;">Reason</td><td>${state.reason}</td></tr>
+            </tbody>
+          </table>
+        </div>`;
+    }
+
+    document.getElementById('btnNext').addEventListener('click', () => {
+      if (currentStep === 1 && !state.specialtyId) { toast('Please select a specialty.', 'error'); return; }
+      if (currentStep === 2 && !state.doctorId) { toast('Please select a doctor.', 'error'); return; }
+      if (currentStep === 3 && !state.date) { toast('Please select a date.', 'error'); return; }
+      if (currentStep === 4 && !state.time) { toast('Please select an available time slot.', 'error'); return; }
+      if (currentStep === 5) {
+        if (!state.type) { toast('Please select a consultation type.', 'error'); return; }
+      }
+      if (currentStep === 6) {
+        state.reason = document.getElementById('apptReason').value.trim();
+        if (!state.reason) { toast('Please describe the reason for your visit.', 'error'); return; }
+      }
+      if (currentStep === 7) {
+        confirmAppointment();
+        return;
+      }
+      if (currentStep === 4) { goToStep(5); renderTypeOptions(); return; }
+      goToStep(currentStep + 1);
+    });
+
+    document.getElementById('btnBack').addEventListener('click', () => {
+      if (currentStep > 1) goToStep(currentStep - 1);
+    });
+
+    function confirmAppointment() {
+      const doc = doctors.find(d => d.id === state.doctorId);
+      const id = 'APT-' + Math.floor(3000 + Math.random() * 6000);
+      const appt = {
+        id, patientId: user.patientId, doctorId: state.doctorId, specialtyId: state.specialtyId,
+        date: state.date, time: state.time, type: state.type, locationId: doc.locationId,
+        reason: state.reason, status: 'Pending', createdAt: today()
+      };
+      DB.insert(DB_KEYS.appointments, appt);
+      addNotification(user.id, 'Appointment requested', `Your appointment with ${doc.name} on ${formatDate(state.date)} is pending confirmation.`, 'appointment');
+      addAuditLog(user.name, 'Booked appointment', 'Appointments');
+      document.getElementById('confirmId').textContent = id;
+      goToStep(8);
+      toast('Appointment booked successfully!', 'success');
+    }
+
+    goToStep(1);
+  }
+</script>
+</body>
+</html>
